@@ -77,7 +77,7 @@ The manifest contains exactly three deterministic files:
 - Preserve section order. Unsupported optional kinds may be skipped only when the contract runtime rule permits it; unsupported required kinds are fatal.
 - Keep provenance in `/pagespec.json` for diagnostics. It is never used to rewrite content.
 - Return static HTML with no scripts and a restrictive Content Security Policy.
-- Run the preview in an iframe sandbox that allows only outbound popup navigation.
+- Run the preview in an iframe sandbox that permits same-origin identity for Firefox COEP compatibility and outbound popup navigation, but still forbids scripts and forms. The rendered document's CSP independently blocks scripts.
 - Use no LLM, provider, prompt, shell, package installation, `eval`, WebContainer, or runtime fetch in the compile path.
 
 This POC is not yet a production security boundary. Authentication, trusted transport, artifact storage, audit logging, rate limiting, and a reviewed deployment topology remain future work.

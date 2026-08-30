@@ -101,7 +101,7 @@ describe('PageSpec V1 renderer POC', () => {
     const { manifest } = compilePageSpecToProjectManifest(copyFixture());
     const preview = inlineDocumentRuntime.prepare(manifest);
     expect(preview.document).toBe(manifest.files[manifest.entry]);
-    expect(preview.sandbox).toEqual(['allow-popups', 'allow-popups-to-escape-sandbox']);
+    expect(preview.sandbox).toEqual(['allow-same-origin', 'allow-popups', 'allow-popups-to-escape-sandbox']);
   });
 
   it('throws a classified error instead of rendering an invalid page', () => {

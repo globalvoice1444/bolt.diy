@@ -13,7 +13,7 @@ export interface ProjectManifest {
 export interface RuntimePreview {
   document: string;
   mimeType: 'text/html; charset=utf-8';
-  sandbox: readonly ['allow-popups', 'allow-popups-to-escape-sandbox'];
+  sandbox: readonly ['allow-same-origin', 'allow-popups', 'allow-popups-to-escape-sandbox'];
 }
 
 export interface RuntimePort {
@@ -35,7 +35,7 @@ export class InlineDocumentRuntime implements RuntimePort {
     return {
       document,
       mimeType: 'text/html; charset=utf-8',
-      sandbox: ['allow-popups', 'allow-popups-to-escape-sandbox'],
+      sandbox: ['allow-same-origin', 'allow-popups', 'allow-popups-to-escape-sandbox'],
     };
   }
 }
