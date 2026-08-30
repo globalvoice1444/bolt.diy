@@ -10,9 +10,32 @@ import {
 
 export const POC_RENDERER_LINK_HOST_CEILING = ['ithinq.ai', 'partners.ithinq.ai'] as const;
 
+/**
+ * Seams for the renderer-owned link-host ceiling.
+ *
+ * No current caller passes either option. The POC routes always validate with
+ * the defaults, so every PageSpec is checked against
+ * POC_RENDERER_LINK_HOST_CEILING. They are kept deliberately, not as pending
+ * wiring: the ceiling is a compensating control for untrusted transport, and
+ * these options are where that control is released once the transport itself
+ * carries the trust. Neither is exercised by a test.
+ */
 export interface PageSpecValidationOptions {
-  /** The file-import POC applies a local ceiling unless transport is trusted. */
+  /**
+   * Honour the document's own `allowedLinkHosts` instead of intersecting it
+   * with the renderer ceiling.
+   *
+   * Only correct once a PageSpec arrives over an authenticated channel from the
+   * Growth Engine, which this POC does not implement. While transport is
+   * unauthenticated it must stay unset, or a hostile document could authorize
+   * its own CTA host.
+   */
   trustedTransport?: boolean;
+
+  /**
+   * Replace the built-in ceiling for a deployment fronting different hosts.
+   * Unused by the POC; the default constant is always applied.
+   */
   rendererAllowedLinkHosts?: readonly string[];
 }
 

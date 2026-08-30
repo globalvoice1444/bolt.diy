@@ -1,6 +1,6 @@
 # iThinq PageSpec renderer POC
 
-Status: local proof of concept on `ithinq/pagespec-renderer-poc`. It is not connected to the Partner Network, deployed, or pushed.
+Status: proof of concept on `ithinq/pagespec-renderer-poc`, pushed to the Bolt fork and open for review as PR #1. It is not merged, not deployed, and not connected to the Partner Network.
 
 ## Outcome
 
@@ -83,12 +83,70 @@ The manifest contains exactly three deterministic files:
 
 This POC is not yet a production security boundary. Authentication, trusted transport, artifact storage, audit logging, rate limiting, and a reviewed deployment topology remain future work.
 
+### The unwired `trustedTransport` option
+
+`PageSpecValidationOptions` exposes `trustedTransport` and `rendererAllowedLinkHosts`. **No current caller passes either.** Both POC routes call the compiler with no options, so every PageSpec is validated against the built-in `POC_RENDERER_LINK_HOST_CEILING` (`ithinq.ai`, `partners.ithinq.ai`). Neither option is exercised by a test.
+
+They are retained deliberately, and this should not be read as wiring left half-finished:
+
+- The host ceiling is a **compensating control for untrusted transport**. The POC ingests a PageSpec from a local file or an unauthenticated `POST`, so it cannot take the document's own `allowedLinkHosts` at face value — that is what stops a hostile document from authorizing its own CTA host.
+- `trustedTransport` is the point at which that control is released, and it is only correct once the PageSpec arrives over an authenticated channel from the Growth Engine. Until then it must stay unset.
+- `rendererAllowedLinkHosts` lets a future deployment front different hosts without editing the validator.
+
+Keeping the seam visible is the point: it documents where the trust boundary moves when transport becomes authenticated. It is not a promise that the next commit wires it.
+
 ## What this proves
 
 - A real producer-emittable PageSpec can render without a free-form prompt.
 - The smallest integration seam is a pure compiler that accepts `unknown`, validates, and returns a runtime-neutral project manifest.
 - Bolt's existing LLM/provider and WebContainer systems are unnecessary for the deterministic landing-page path.
 - A future sandbox or artifact publisher can implement `RuntimePort` without changing contract validation or compilation.
+
+## Architectural note: this mapping is not the final product design model
+
+**The deterministic section mapping in this POC is not the final product design model.**
+
+What the POC proves is the *seam*, not the aesthetic:
+
+- PageSpec transport
+- contract validation
+- trust and security boundaries
+- deterministic, safe rendering
+- browser compatibility
+
+A one-kind-to-one-component mapping was the cheapest way to prove those five things without a model in the loop. It must **not** be read as establishing a permanent rule that:
+
+- one PageSpec kind maps to one fixed visual component
+- pages use one template
+- pages use one color system
+- section order and layout are permanently rigid
+- the renderer cannot create richer visual compositions
+
+### Future product direction
+
+iThinq Partner Network users should be able to describe, in plain language, what they want to promote.
+
+iThinq and the Growth Engine supply the trusted inputs: product facts, Partner context, campaign constraints, referral URLs, disclosures, and other authoritative business information.
+
+The Bolt-derived creative renderer may then have broad creative freedom over **presentation**, including page composition, responsive layout, visual hierarchy, typography, color systems and themes, imagery and image placement, section presentation, cards, galleries, comparison treatments, FAQ presentation, CTA presentation, animation and motion where appropriate, long-form versus concise page treatment, industry-specific aesthetics, and landing-page, funnel, or site-style presentation.
+
+**The guardrail is truth, not visual creativity.**
+
+The renderer may never fabricate:
+
+- product capabilities
+- customer reviews or testimonials
+- statistics
+- pricing
+- guarantees
+- legal or compliance claims
+- Partner identity
+- referral destinations
+- required disclosures
+
+The renderer should eventually be capable of producing pages that look materially different from one another, rather than merely filling a fixed template. The ownership boundary is what stays fixed: the Growth Engine owns business truth, the renderer owns presentation. Widening presentational freedom does not widen the renderer's authority over truth.
+
+None of that future system is built in this POC, and this commit does not begin it.
 
 ## Explicitly out of scope
 
@@ -100,17 +158,26 @@ This POC is not yet a production security boundary. Authentication, trusted tran
 
 ## Verification
 
-At implementation time:
+Re-verified at review time on the pushed branch:
 
-- Focused PageSpec tests: 10 passed.
-- Full Bolt suite: 62 passed across 4 files.
-- TypeScript: passed.
-- ESLint: passed.
-- Remix/Vite production build: passed with existing upstream warnings.
-- HTTP smoke test: workbench and preview returned `200`; preview returned the CSP and contained no script element.
+- Focused PageSpec tests: 11 passed (10 in `compiler.spec.ts`, 1 in `preview-response.spec.ts`).
+- Full Bolt suite: 63 passed across 5 files.
+- TypeScript: passed, clean.
+- ESLint: passed, clean.
+- Remix/Vite production build: passed with existing upstream warnings. In a memory-constrained environment it needs a raised Node heap (`--max-old-space-size`); this is a pre-existing characteristic of the Bolt bundle, not something this branch introduces.
+- HTTP smoke test: workbench and preview returned `200`; preview returned the CSP and cross-origin headers and contained no script element.
 
-The automated browser package was present but its Chromium binary was not installed in this environment, so screenshot-based visual regression was not claimed as complete.
+Browser verification:
+
+| Browser | Result |
+| --- | --- |
+| Firefox 154.0.1 | Pass |
+| Edge (Chromium) | Pass |
+
+Firefox was driven through Marionette so the assertion runs after hydration rather than at the load event. Inside the nested preview iframe it observed the rendered `h1`, six `data-section-index` sections, both CTA hosts, and zero `script` elements, with no cross-origin access error. Edge rendered the same page and manifest sidebar with zero findings.
+
+There is still no committed fixture-driven visual regression suite; browser verification is scripted but not automated in CI.
 
 ## Next safe step
 
-Review this local commit. If approved, push only the POC branch to the Bolt fork. After that, add fixture-driven visual regression tests and decide whether the production runtime should publish static artifacts or serve compiled documents dynamically. Neither choice changes the Growth Engine ownership boundary.
+Review PR #1. After review, add fixture-driven visual regression tests and decide whether the production runtime should publish static artifacts or serve compiled documents dynamically. Neither choice changes the Growth Engine ownership boundary.
