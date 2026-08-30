@@ -1,0 +1,144 @@
+{
+    "specVersion": "1.0",
+    "page": {
+        "reference": "spec:med-spa:overloaded-front-desk",
+        "origin": "generated",
+        "campaign": "vertical-med-spa",
+        "vertical": "med-spa",
+        "situation": "overloaded-front-desk",
+        "awareness": "problem-aware",
+        "sophistication": 2,
+        "name": "Med Spa — A front desk that cannot keep up",
+        "audience": "Owner, or the practice manager who runs the front desk",
+        "headline": "In a treatment room while the front desk is checking someone out",
+        "subheadline": "An AI Voice Assistant that answers while the front desk is with a client, asks what a consultation enquiry needs, and keeps the follow-up moving."
+    },
+    "partner": {
+        "displayName": "Example Partner",
+        "businessName": null,
+        "introduction": null
+    },
+    "ctas": {
+        "primary": {
+            "label": "Book a demo",
+            "url": "https://ithinq.ai/demo?ref=8f14e45f-ce7a-4a5b-9f2d-0c1b2a3d4e5f",
+            "role": "primary",
+            "carriesAttribution": true
+        },
+        "secondary": {
+            "label": "See iThinq AI",
+            "url": "https://ithinq.ai/?ref=8f14e45f-ce7a-4a5b-9f2d-0c1b2a3d4e5f",
+            "role": "secondary",
+            "carriesAttribution": true
+        }
+    },
+    "disclosure": {
+        "text": "This page is shared by an independent iThinq AI Partner, who may be compensated if you become a customer.",
+        "placement": "footer"
+    },
+    "policy": {
+        "allowedLinkHosts": [
+            "ithinq.ai",
+            "partners.ithinq.ai"
+        ]
+    },
+    "sections": [
+        {
+            "kind": "scenario",
+            "purpose": "create_recognition",
+            "emphasis": "lead",
+            "heading": "The situation",
+            "body": "In a treatment room while the front desk is checking someone out",
+            "provenance": {
+                "factRefs": []
+            }
+        },
+        {
+            "kind": "pain",
+            "purpose": "intensify_problem",
+            "emphasis": "support",
+            "heading": "What it costs",
+            "body": "Consultation enquiries arrive while the team is with clients. Post-consultation follow-up depends on who has a spare ten minutes. The consultation is booked somewhere else by the evening.",
+            "provenance": {
+                "factRefs": []
+            }
+        },
+        {
+            "kind": "mechanism",
+            "purpose": "explain_mechanism",
+            "emphasis": "lead",
+            "heading": "How it works",
+            "body": "Answers inbound calls. Takes the caller through the questions the team would ask. Hands the conversation back in a form the business can act on. Asks the same questions in the same order whoever is on shift. Keeps follow-up moving after the call. Answers calls outside opening hours, where your setup supports it — depends on how the setup is configured — confirm on the demo rather than assuming it is on. Does not replace the people who take the conversations that need a person.",
+            "provenance": {
+                "factRefs": [
+                    "f_96306cd554455b5bb303d64dbf5437ce7eb92545749c96e04df0ed580e62e643",
+                    "f_af61c1bdbb3db20f5b4a6ca334254274ad375a3a365c19f42709aadedbe16db0",
+                    "f_a8c46ae479f5359a6552000d08672866e39fd0dad9239f0a35376ba2e206a825",
+                    "f_c2dd9310361bfad1a0a5147dd8229dd98e1d8639388c368fa5bf6ff67a22fb91",
+                    "f_0c3606bc20c166f8f32523f27114c864f20e96baa1cfc7262b1e2dbc0fe0faad",
+                    "f_a78a68b95e01eef580dbbd9e8e5a1a24e0b98f40c327ac803ca2db51314d25a6",
+                    "f_701d06dee7d3b0362003c55f0cad1dabbda50af451c6b4b509c9501892af6e94"
+                ]
+            }
+        },
+        {
+            "kind": "vertical_fit",
+            "purpose": "establish_fit",
+            "emphasis": "support",
+            "heading": "This suits you if",
+            "items": [
+                "Consultation enquiries arrive while the team is with clients",
+                "The front desk is the busiest point in the clinic",
+                "Follow-up after a consult depends on who has a spare ten minutes"
+            ],
+            "provenance": {
+                "factRefs": [
+                    "f_96306cd554455b5bb303d64dbf5437ce7eb92545749c96e04df0ed580e62e643",
+                    "f_af61c1bdbb3db20f5b4a6ca334254274ad375a3a365c19f42709aadedbe16db0",
+                    "f_a8c46ae479f5359a6552000d08672866e39fd0dad9239f0a35376ba2e206a825",
+                    "f_c2dd9310361bfad1a0a5147dd8229dd98e1d8639388c368fa5bf6ff67a22fb91",
+                    "f_0c3606bc20c166f8f32523f27114c864f20e96baa1cfc7262b1e2dbc0fe0faad",
+                    "f_a78a68b95e01eef580dbbd9e8e5a1a24e0b98f40c327ac803ca2db51314d25a6"
+                ]
+            }
+        },
+        {
+            "kind": "vertical_fit",
+            "purpose": "establish_fit",
+            "emphasis": "support",
+            "heading": "This is not for you if",
+            "items": [
+                "You have front-desk cover that picks up as enquiries arrive",
+                "You are looking for clinical advice rather than help with the enquiries around it"
+            ],
+            "provenance": {
+                "factRefs": [
+                    "f_701d06dee7d3b0362003c55f0cad1dabbda50af451c6b4b509c9501892af6e94",
+                    "f_001dabb344cd8491be47d7ee23614a4c5f6218d228ba841692f05cdd76d34161"
+                ]
+            }
+        },
+        {
+            "kind": "faq",
+            "purpose": "handle_objection",
+            "emphasis": "support",
+            "heading": "Common questions",
+            "qa": [
+                {
+                    "question": "If they say it sounds too technical",
+                    "answer": "That is the usual reaction, and it is fair. From your side it is a phone call — the caller has an ordinary conversation, and nobody on your team has to learn a new system to get the message. Take a look and tell me if I am wrong."
+                },
+                {
+                    "question": "If they say not right now",
+                    "answer": "Totally fine. I will send the link anyway so it is there when the timing is better. No follow-up unless you want one."
+                }
+            ],
+            "provenance": {
+                "factRefs": [
+                    "f_701d06dee7d3b0362003c55f0cad1dabbda50af451c6b4b509c9501892af6e94",
+                    "f_001dabb344cd8491be47d7ee23614a4c5f6218d228ba841692f05cdd76d34161"
+                ]
+            }
+        }
+    ]
+}
