@@ -146,7 +146,7 @@ The renderer may never fabricate:
 
 The renderer should eventually be capable of producing pages that look materially different from one another, rather than merely filling a fixed template. The ownership boundary is what stays fixed: the Growth Engine owns business truth, the renderer owns presentation. Widening presentational freedom does not widen the renderer's authority over truth.
 
-None of that future system is built in this POC, and this commit does not begin it.
+Phase 1 of that direction is now implemented on `ithinq/creative-renderer-productization`: a presentation plan and four interchangeable creative directions built on this same seam. See [`ITHINQ-CREATIVE-RENDERER.md`](./ITHINQ-CREATIVE-RENDERER.md). The truth boundary described above is unchanged by it.
 
 ## Explicitly out of scope
 

@@ -3,13 +3,33 @@ import examplePageSpec from '@ithinq-pagespec/page-spec.example.json';
 import {
   compilePageSpecToProjectManifest,
   inlineDocumentRuntime,
+  isDirectionId,
   PageSpecValidationError,
 } from '~/lib/ithinq/pagespec';
 
 const MAX_PAGESPEC_BYTES = 512 * 1024;
 
-function renderPageSpec(input: unknown): Response {
-  const { manifest } = compilePageSpecToProjectManifest(input);
+/**
+ * Read the requested creative direction from the URL.
+ *
+ * Presentation-only, and closed: anything outside the known direction set is
+ * ignored so the renderer falls back to the direction derived from the
+ * document. Untrusted input can influence how the page looks, never what it
+ * says, and never the validation or URL policy applied to it.
+ */
+function requestedDirection(request: Pick<Request, 'url'> | undefined): string | undefined {
+  try {
+    const value = new URL(request?.url ?? '').searchParams.get('direction');
+
+    return isDirectionId(value) ? value : undefined;
+  } catch {
+    // Presentation-only input. An unusable URL must never stop the page rendering.
+    return undefined;
+  }
+}
+
+function renderPageSpec(input: unknown, direction?: string): Response {
+  const { manifest } = compilePageSpecToProjectManifest(input, { direction });
   const preview = inlineDocumentRuntime.prepare(manifest);
 
   return new Response(preview.document, {
@@ -29,8 +49,8 @@ function jsonError(status: number, code: string, detail: string): Response {
   return Response.json({ error: { code, detail } }, { status, headers: { 'Cache-Control': 'no-store' } });
 }
 
-export function loader(_args: LoaderFunctionArgs) {
-  return renderPageSpec(examplePageSpec);
+export function loader({ request }: LoaderFunctionArgs) {
+  return renderPageSpec(examplePageSpec, requestedDirection(request));
 }
 
 export async function action({ request }: ActionFunctionArgs) {
@@ -59,7 +79,7 @@ export async function action({ request }: ActionFunctionArgs) {
   }
 
   try {
-    return renderPageSpec(input);
+    return renderPageSpec(input, requestedDirection(request));
   } catch (error) {
     if (error instanceof PageSpecValidationError) {
       return Response.json(

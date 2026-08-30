@@ -7,6 +7,10 @@ export interface ProjectManifest {
     contract: 'PageSpec 1.0';
     contractSource: string;
     pageReference: string;
+
+    /** Presentation provenance. Which creative direction composed the document. */
+    direction: string;
+    directionLabel: string;
   };
 }
 
