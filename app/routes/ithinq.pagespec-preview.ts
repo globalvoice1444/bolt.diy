@@ -16,6 +16,7 @@ function renderPageSpec(input: unknown): Response {
     headers: {
       'Content-Type': preview.mimeType,
       'Cache-Control': 'no-store',
+      ...preview.headers,
       'Content-Security-Policy':
         "default-src 'none'; style-src 'unsafe-inline'; img-src https: data:; frame-ancestors 'self'; base-uri 'none'; form-action 'none'",
       'X-Content-Type-Options': 'nosniff',

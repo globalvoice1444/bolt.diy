@@ -54,7 +54,7 @@ export default function PageSpecRendererPoc() {
           <iframe
             title="Rendered PageSpec landing page"
             src="/ithinq/pagespec-preview"
-            sandbox="allow-same-origin allow-popups allow-popups-to-escape-sandbox"
+            sandbox="allow-popups allow-popups-to-escape-sandbox"
             className="block w-full h-[calc(100vh-150px)] min-h-[760px] border-0"
           />
         </div>
