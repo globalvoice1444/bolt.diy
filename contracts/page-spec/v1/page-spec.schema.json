@@ -1,0 +1,658 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://partners.ithinq.ai/contracts/page-spec/v1/page-spec.schema.json",
+  "title": "PageSpec V1",
+  "description": "The authoritative, renderer-neutral contract the iThinq Growth Engine emits for an external renderer. The Growth Engine owns business truth; the renderer owns presentation. A consumer that needs Partner Network business logic to render this document has found a defect in the contract, not a gap in its own implementation.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "specVersion",
+    "page",
+    "partner",
+    "ctas",
+    "disclosure",
+    "policy",
+    "sections"
+  ],
+  "properties": {
+    "specVersion": {
+      "description": "Exactly 1.0. This schema is strict — `additionalProperties: false` throughout, closed purpose enum — so a document from a later contract version cannot be validated safely by a 1.0 consumer. A 1.1 is a real minor release, and a renderer adopts it by updating its copied schema and types, not by optimistically accepting it.",
+      "const": "1.0"
+    },
+    "page": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "reference",
+        "origin",
+        "campaign",
+        "vertical",
+        "situation",
+        "awareness",
+        "sophistication",
+        "name",
+        "audience",
+        "headline",
+        "subheadline"
+      ],
+      "properties": {
+        "reference": {
+          "description": "Stable public identity for this page. Never a database id.",
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 120
+        },
+        "origin": {
+          "description": "Which producer made this document. `generated` means purpose, emphasis, situation, awareness, sophistication and provenance are AUTHORED strategy from a CreativeBrief, and the schema requires them. `legacy` means the page was hand-authored: `purpose` is a documented inference, strategy values are null, and provenance is an honest empty array. Never treat a legacy inference as authored strategy.",
+          "type": "string",
+          "enum": [
+            "generated",
+            "legacy"
+          ]
+        },
+        "templateKey": {
+          "description": "Diagnostic only. A renderer must not branch on it.",
+          "type": [
+            "string",
+            "null"
+          ],
+          "maxLength": 64
+        },
+        "campaign": {
+          "description": "Campaign CODE, never an id. Non-null on generated documents.",
+          "type": [
+            "string",
+            "null"
+          ],
+          "maxLength": 64
+        },
+        "vertical": {
+          "description": "The market this page is written for. May be null in EITHER origin: the flagship brief is deliberately not market-scoped, and a hand-authored template need not carry a vertical. This is the one strategy field a legacy document may legitimately populate, because it is recorded on the template row itself.",
+          "type": [
+            "string",
+            "null"
+          ],
+          "maxLength": 64
+        },
+        "situation": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "maxLength": 64
+        },
+        "awareness": {
+          "description": "A density hint at most. It must never change what is said.",
+          "type": [
+            "string",
+            "null"
+          ],
+          "enum": [
+            "unaware",
+            "problem-aware",
+            "solution-aware",
+            "product-aware",
+            "most-aware",
+            null
+          ]
+        },
+        "sophistication": {
+          "description": "How many times this market has heard the claim. 1..5.",
+          "type": [
+            "integer",
+            "null"
+          ],
+          "minimum": 1,
+          "maximum": 5
+        },
+        "name": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 160
+        },
+        "audience": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 200
+        },
+        "headline": {
+          "description": "The hook. There is no hero section; this is where it lives.",
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 200
+        },
+        "subheadline": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 300
+        }
+      }
+    },
+    "partner": {
+      "description": "Display-safe Partner identity, already resolved. There is deliberately no identifier: a renderer that cannot see a Partner id cannot construct a referral URL, which is the point.",
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "displayName"
+      ],
+      "properties": {
+        "displayName": {
+          "description": "Null means no name is safe to show. Render without a personal introduction; never substitute an identifier.",
+          "type": [
+            "string",
+            "null"
+          ],
+          "maxLength": 80
+        },
+        "businessName": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "maxLength": 120
+        },
+        "introduction": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "maxLength": 400
+        }
+      }
+    },
+    "ctas": {
+      "description": "The ask. There is no CTA section; this is where it lives.",
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "primary"
+      ],
+      "properties": {
+        "primary": {
+          "$ref": "#/$defs/cta"
+        },
+        "secondary": {
+          "oneOf": [
+            {
+              "$ref": "#/$defs/cta"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        }
+      }
+    },
+    "disclosure": {
+      "description": "Structurally required, so a document without it fails validation rather than rendering a non-compliant page.",
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "text"
+      ],
+      "properties": {
+        "text": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 500
+        },
+        "placement": {
+          "type": "string",
+          "enum": [
+            "footer",
+            "header",
+            "inline"
+          ]
+        }
+      }
+    },
+    "policy": {
+      "description": "Growth Engine INTENT, not a security trust anchor. The document travels with its own host list, so a tampered document could authorise its own hostname. A consumer must either receive the document over an authenticated, trusted channel, or intersect this list with a renderer-controlled security ceiling. See README, URL trust model.",
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "allowedLinkHosts"
+      ],
+      "properties": {
+        "allowedLinkHosts": {
+          "type": "array",
+          "minItems": 1,
+          "items": {
+            "type": "string",
+            "minLength": 1
+          }
+        }
+      }
+    },
+    "sections": {
+      "description": "Rendered in array order. A renderer MUST NOT reorder, merge or split: order is an argument, and the Growth Engine owns it.",
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "$ref": "#/$defs/section"
+      }
+    }
+  },
+  "allOf": [
+    {
+      "$comment": "Generated documents carry the producer's guarantees structurally, not by convention.",
+      "if": {
+        "properties": {
+          "page": {
+            "properties": {
+              "origin": {
+                "const": "generated"
+              }
+            },
+            "required": [
+              "origin"
+            ]
+          }
+        },
+        "required": [
+          "page"
+        ]
+      },
+      "then": {
+        "properties": {
+          "page": {
+            "properties": {
+              "campaign": {
+                "type": "string",
+                "minLength": 1
+              },
+              "situation": {
+                "type": "string",
+                "minLength": 1
+              },
+              "awareness": {
+                "type": "string",
+                "enum": [
+                  "unaware",
+                  "problem-aware",
+                  "solution-aware",
+                  "product-aware",
+                  "most-aware"
+                ]
+              },
+              "sophistication": {
+                "type": "integer",
+                "minimum": 1,
+                "maximum": 5
+              }
+            }
+          },
+          "sections": {
+            "items": {
+              "required": [
+                "kind",
+                "purpose",
+                "provenance",
+                "emphasis"
+              ],
+              "if": {
+                "properties": {
+                  "purpose": {
+                    "enum": [
+                      "explain_mechanism",
+                      "establish_fit",
+                      "handle_objection",
+                      "reduce_risk",
+                      "drive_action"
+                    ]
+                  }
+                },
+                "required": [
+                  "purpose"
+                ]
+              },
+              "then": {
+                "properties": {
+                  "provenance": {
+                    "properties": {
+                      "factRefs": {
+                        "minItems": 1
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    {
+      "$comment": "A hand-authored page has no CreativeBrief, so these are null — not merely nullable. A plausible value here would be indistinguishable from authored strategy.",
+      "if": {
+        "properties": {
+          "page": {
+            "properties": {
+              "origin": {
+                "const": "legacy"
+              }
+            },
+            "required": [
+              "origin"
+            ]
+          }
+        },
+        "required": [
+          "page"
+        ]
+      },
+      "then": {
+        "properties": {
+          "page": {
+            "properties": {
+              "campaign": {
+                "type": "null"
+              },
+              "situation": {
+                "type": "null"
+              },
+              "awareness": {
+                "type": "null"
+              },
+              "sophistication": {
+                "type": "null"
+              }
+            }
+          }
+        }
+      }
+    }
+  ],
+  "$defs": {
+    "cta": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "label",
+        "url",
+        "role"
+      ],
+      "properties": {
+        "label": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 80
+        },
+        "url": {
+          "description": "Fully resolved, attribution already attached. Render exactly. Never append, rewrite, shorten, proxy or re-sign it.",
+          "$ref": "#/$defs/httpsUrl"
+        },
+        "role": {
+          "type": "string",
+          "enum": [
+            "primary",
+            "secondary"
+          ]
+        },
+        "carriesAttribution": {
+          "description": "Stripping or altering the URL destroys the Partner's commission.",
+          "type": "boolean"
+        }
+      }
+    },
+    "httpsUrl": {
+      "type": "string",
+      "format": "uri",
+      "pattern": "^https://[^\\s]+$",
+      "maxLength": 2048
+    },
+    "asset": {
+      "description": "A reference, never storage. No credentials, no provider metadata, no filesystem paths.",
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "url",
+        "kind",
+        "alt"
+      ],
+      "properties": {
+        "url": {
+          "$ref": "#/$defs/httpsUrl"
+        },
+        "kind": {
+          "type": "string",
+          "enum": [
+            "image",
+            "logo",
+            "illustration"
+          ]
+        },
+        "alt": {
+          "type": "string",
+          "maxLength": 300
+        },
+        "role": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "maxLength": 64
+        },
+        "required": {
+          "description": "A required asset that will not load is FATAL; an optional one is omitted.",
+          "type": "boolean"
+        }
+      }
+    },
+    "textItems": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "type": "string",
+        "minLength": 1,
+        "maxLength": 400
+      }
+    },
+    "qaItems": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "question",
+          "answer"
+        ],
+        "properties": {
+          "question": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 300
+          },
+          "answer": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 1200
+          }
+        }
+      }
+    },
+    "factRef": {
+      "type": "string",
+      "pattern": "^f_[0-9a-f]{64}$"
+    },
+    "provenance": {
+      "description": "Which approved facts this section rests on. `f_` plus a full lowercase SHA-256 taken over the versioned namespace `page-spec/v1/fact:` and the approved fact's own text — never a database id, never truncated. Required on every section; the array may be empty where that is legitimate (a non-asserting generated beat, or any legacy section, where nothing recorded it). A renderer may use these for diagnostics, traceability and validation. It may NEVER use them to rewrite content.",
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "factRefs"
+      ],
+      "properties": {
+        "factRefs": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/factRef"
+          }
+        }
+      }
+    },
+    "sectionKind": {
+      "description": "The canonical V1 vocabulary: exactly the section kinds PageSpecComposer emits, one per strategic purpose that yields a section. `hero` and `cta` are not kinds — the hook is `page.headline`/`page.subheadline` and the ask is `ctas.primary`. An unrecognised kind is skipped unless the section is marked required; see README.",
+      "enum": [
+        "interrupt",
+        "scenario",
+        "pain",
+        "mechanism",
+        "vertical_fit",
+        "faq",
+        "risk"
+      ]
+    },
+    "sectionPurpose": {
+      "description": "WHY the section is on the page, held separately from how it looks. A renderer must not infer strategy from kind.",
+      "enum": [
+        "interrupt_pattern",
+        "create_recognition",
+        "intensify_problem",
+        "explain_mechanism",
+        "establish_fit",
+        "handle_objection",
+        "reduce_risk",
+        "drive_action"
+      ]
+    },
+    "assertingPurposes": {
+      "description": "The purposes that assert something about the product, and therefore require at least one fact reference on a generated document. The other three describe the reader's own day and assert nothing.",
+      "enum": [
+        "explain_mechanism",
+        "establish_fit",
+        "handle_objection",
+        "reduce_risk",
+        "drive_action"
+      ]
+    },
+    "section": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "kind",
+        "purpose",
+        "provenance"
+      ],
+      "properties": {
+        "kind": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 64
+        },
+        "purpose": {
+          "$ref": "#/$defs/sectionPurpose"
+        },
+        "required": {
+          "description": "True when the page is incomplete without this section. Governs whether an unrecognised kind is skipped or fatal.",
+          "type": "boolean"
+        },
+        "emphasis": {
+          "description": "Content hierarchy, which the Growth Engine owns. How prominence is expressed is entirely the renderer's business.",
+          "type": "string",
+          "enum": [
+            "lead",
+            "support",
+            "aside"
+          ]
+        },
+        "eyebrow": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "maxLength": 80
+        },
+        "heading": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "maxLength": 200
+        },
+        "body": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "maxLength": 2000
+        },
+        "items": {
+          "$ref": "#/$defs/textItems"
+        },
+        "qa": {
+          "$ref": "#/$defs/qaItems"
+        },
+        "asset": {
+          "$ref": "#/$defs/asset"
+        },
+        "provenance": {
+          "$ref": "#/$defs/provenance"
+        }
+      },
+      "allOf": [
+        {
+          "if": {
+            "properties": {
+              "kind": {
+                "enum": [
+                  "interrupt",
+                  "scenario",
+                  "pain",
+                  "mechanism",
+                  "risk"
+                ]
+              }
+            },
+            "required": [
+              "kind"
+            ]
+          },
+          "then": {
+            "required": [
+              "heading",
+              "body"
+            ]
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "kind": {
+                "const": "vertical_fit"
+              }
+            },
+            "required": [
+              "kind"
+            ]
+          },
+          "then": {
+            "required": [
+              "heading",
+              "items"
+            ]
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "kind": {
+                "const": "faq"
+              }
+            },
+            "required": [
+              "kind"
+            ]
+          },
+          "then": {
+            "required": [
+              "heading",
+              "qa"
+            ]
+          }
+        }
+      ]
+    }
+  }
+}
