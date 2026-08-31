@@ -4,6 +4,7 @@ import {
   getDirection,
   planPresentation,
   type CreativePresentationPlan,
+  type CopyText,
   type GeneratedMedia,
   type PlanOptions,
 } from './creative';
@@ -22,6 +23,14 @@ export interface CompilePageSpecOptions extends PageSpecValidationOptions, PlanO
    * and generated creative is the renderer's own material.
    */
   generatedMedia?: readonly GeneratedMedia[];
+
+  /**
+   * Renderer-local presentation copy.
+   *
+   * Overlays how the page reads; never enters `/pagespec.json`, and cannot
+   * address the disclosure, the CTAs or Partner identity.
+   */
+  copy?: CopyText;
 }
 
 export interface CompilePageSpecResult {
@@ -83,7 +92,7 @@ export function compilePageSpecToProjectManifest(
     manifestVersion: 1,
     entry: '/index.html',
     files: {
-      '/index.html': composeDocument(spec, plan, direction, generatedMedia),
+      '/index.html': composeDocument(spec, plan, direction, generatedMedia, options?.copy),
       '/pagespec.json': canonicalJson(spec),
       '/presentation.json': canonicalJson(plan),
       '/renderer.json': canonicalJson(metadata),
