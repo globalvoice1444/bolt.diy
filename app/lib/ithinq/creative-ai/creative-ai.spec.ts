@@ -267,3 +267,35 @@ describe('orchestration', () => {
     expect(new TextDecoder().decode(stored!.bytes)).toContain('not AI generated');
   });
 });
+
+describe('imagery follows the campaign, not only the document', () => {
+  /*
+   * A live acceptance run produced a law-firm campaign, built on a med-spa
+   * document, illustrated with med-spa consultation rooms. Facts are selected
+   * by request now, so scene choice has to be too — it is presentation, and a
+   * photograph asserts nothing.
+   */
+  it('uses the requested market for scene selection', () => {
+    const spec = JSON.parse(JSON.stringify(examplePageSpec)) as PageSpec;
+    const strategy = deriveCreativeStrategy(
+      spec,
+      normaliseCreativeRequest({ userInstruction: 'image-forward campaign' }),
+    );
+
+    const medSpa = planAssetNeeds(spec, strategy, 'med-spa');
+    const legal = planAssetNeeds(spec, strategy, 'legal');
+
+    expect(medSpa[0]!.subject).not.toBe(legal[0]!.subject);
+    expect(legal[0]!.subject).toContain('legal');
+  });
+
+  it('falls back to the document market when the request names none', () => {
+    const spec = JSON.parse(JSON.stringify(examplePageSpec)) as PageSpec;
+    const strategy = deriveCreativeStrategy(
+      spec,
+      normaliseCreativeRequest({ userInstruction: 'image-forward campaign' }),
+    );
+
+    expect(planAssetNeeds(spec, strategy, null)[0]!.subject).toBe(planAssetNeeds(spec, strategy)[0]!.subject);
+  });
+});

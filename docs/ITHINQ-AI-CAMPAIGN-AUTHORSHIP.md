@@ -1,6 +1,7 @@
 # iThinq AI campaign authorship (Phase 4)
 
-Status: on `ithinq/ai-campaign-authorship`. Not merged, not deployed, not connected to the Partner Network.
+Status: merged to `main` (PR #5, merge commit `e2ae2d5`, 2026-08-31). Not deployed, not connected to the Partner Network.
+Live authorship was verified on 2026-08-31 once OpenAI credits were funded; the findings are recorded below.
 
 Phase 3 ([`ITHINQ-AI-CREATIVE-INTELLIGENCE.md`](./ITHINQ-AI-CREATIVE-INTELLIGENCE.md)) could read a plain-language brief and decide how a page should look, sound and be composed. What it could not do was write one. Its truth guard held generated copy to rephrasing sentences the PageSpec already contained, which is safe and is also a ceiling: a Partner who has not already written the page has nothing to rephrase.
 
@@ -184,12 +185,27 @@ No contract change was needed or made. The fixture is the honest minimum instead
 
 Engineering and product review only. No Partner authentication, no production UI.
 
+## What live authorship changed
+
+Running the pipeline against real `gpt-4o` and `gpt-image-1` exposed four defects that no stub could have shown. All are fixed and covered by tests.
+
+**A rejected line had nowhere to fall back to.** Dropping a rejection and keeping the document's copy was right while the document was a Growth Engine page with authoritative prose behind it. Against a fact sheet there is nothing behind it, and the first live run showed the cost: the cliché guard correctly refused five of six bodies, every one fell back to a bare fact restatement, and the page came out as campaign headings sitting on the source document's own sentences — the exact "website paragraphs rearranged" outcome this phase exists to avoid. A rejection now asks for a rewrite before it gives up, and says exactly what was wrong. Two rounds, hard-bounded, never a loop.
+
+**The guard and the audit disagreed about what support means.** `copy-guard` counted the PageSpec's own text as supporting material and the claim audit did not, so a line resting on the document rather than on the fact set passed one layer and was killed by the other. A live med-spa run lost both its mechanism and its limits paragraph that way. The audit is now shown the document's statements too.
+
+**Regulatory claims were freely inventable.** A live law-firm run produced "all data is encrypted during transit and at rest, compliant with GDPR and privacy laws". That particular claim turned out to be supported — iThinq publishes it on its own law-firms page — but nothing in the system required that, and the semantic audit had let the neighbouring invented CRM integration through. GDPR, HIPAA, SOC 2, PCI, encryption and compliance vocabulary now need an approved fact, exactly as awards and guarantees do.
+
+**Two verticals collapsed onto one promise.** A med-spa campaign and a law-firm campaign both headlined "never miss a call" — the same promise with different photography. It is the source website's dominant framing and it would work for any company in any industry, which is this brief's own definition of filler. It is now in the cliché lexicon, and the repair pass writes something specific instead.
+
+**Imagery followed the document while facts followed the request.** Once facts are selected from the website by request, a law-firm campaign built on a med-spa document was getting law-firm copy over med-spa consultation-room photography. Scene choice is presentation — a photograph asserts nothing — so it follows the campaign's market and falls back to the document's.
+
 ## Current limitations
 
 - **The website corpus is the company's marketing prose, not a curated fact sheet.** Statements arrive as the site writes them, including its own superlatives. Extraction refuses borrowed voice and will not lend the site's register to the page, but it does not second-guess iThinq's claims about iThinq — those are the company's to make.
 - **Classification is heuristic.** `process` is the fallback and catches a fair share of what are really capability statements. It affects which facts the selector guarantees a slot to, never what may be asserted.
 - **Refresh needs a headless browser** while ithinq.ai is client-rendered. Campaign generation does not, and neither does any test.
-- **The live copy-generation run did not happen.** The configured OpenAI key authenticates (`/v1/models` returns 200) but the account has no credits: every generation call returns `429 insufficient_quota / credit_balance_exhausted`. Every stage is exercised against a stubbed model in tests, and the outage path was verified against the live endpoint — the campaign degraded to the document's own copy and still rendered a page — but **the quality of model-authored copy is unverified**, and so is live imagery for this phase. Phase 3 proved live image generation separately.
+- **The mechanism beat is the one that most often falls back.** It cites the most facts and invites the most ambition, and across live runs it was the beat most likely to exhaust both repair rounds and keep the document's own wording. Everything else on the page is authored.
+- Title Case headings appear despite the prompt asking for sentence case. It is a style preference rather than a truth or safety rule, so it is not enforced in code.
 - **The claim audit is a model, not a proof.** It is a second opinion that catches what a lexicon cannot, and it can miss. The deterministic guard is the floor, the audit is the ceiling, and neither is a guarantee.
 - **Boundary facts are protected by prompt and audit, not by a deterministic rule.** "Do not contradict a stated limit" is not something a lexicon can check. The audit is told to treat contradiction of a limit as unsupported.
 - **The med-spa contract fact set is a transcription, not Growth Engine data.** The texts are the contract example's own statements; binding them to that document's references is the renderer's reading of the document's ordering. Labelled `document-transcription` for exactly that reason.

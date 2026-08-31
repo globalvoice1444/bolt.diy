@@ -1,5 +1,5 @@
 import type { PageSpec } from '@ithinq-pagespec/page-spec';
-import { guardFactRefs, safeCopy, supportContext, type CopyFinding, type SupportContext } from './copy-guard';
+import { guardCopy, guardFactRefs, supportContext, type CopyFinding, type SupportContext } from './copy-guard';
 import { auditClaims, type AuditedField } from './claim-audit';
 import { documentText, factsForSection, type ApprovedFact, type ApprovedFactSet } from './facts';
 import type { InterpretedRequest } from './interpret';
@@ -67,6 +67,9 @@ export interface CopyResult {
 }
 
 const LENGTH_TREATMENTS = ['concise', 'standard', 'long-form'] as const;
+
+/** How many times a rejected line may be sent back for a rewrite. Never a loop. */
+const REPAIR_ROUNDS = 2;
 
 /**
  * Length budgets, chosen by the writer rather than fixed by the renderer.
@@ -253,6 +256,25 @@ function sectionFrame(spec: PageSpec, set: ApprovedFactSet, index: number) {
   };
 }
 
+/** What the authoring model returns, before anything has been checked. */
+interface AuthorshipResult {
+  campaign: CampaignPlan;
+  audience: string;
+  headline: string;
+  subheadline: string;
+  pageFactRefs: string[];
+  sections: Array<{
+    index: number;
+    intent: string;
+    eyebrow: string | null;
+    heading: string | null;
+    body: string | null;
+    items: string[];
+    qa: Array<{ question: string; answer: string }>;
+    factRefs: string[];
+  }>;
+}
+
 /**
  * Author the campaign.
  *
@@ -284,23 +306,7 @@ export async function authorCampaignCopy(
 
   const frames = spec.sections.map((_, index) => sectionFrame(spec, set, index));
 
-  let result: {
-    campaign: CampaignPlan;
-    audience: string;
-    headline: string;
-    subheadline: string;
-    pageFactRefs: string[];
-    sections: Array<{
-      index: number;
-      intent: string;
-      eyebrow: string | null;
-      heading: string | null;
-      body: string | null;
-      items: string[];
-      qa: Array<{ question: string; answer: string }>;
-      factRefs: string[];
-    }>;
-  };
+  let result: AuthorshipResult;
 
   try {
     result = await generator.generate({
@@ -337,35 +343,120 @@ export async function authorCampaignCopy(
   const support: SupportContext = supportContext(set.facts, documentText(spec), {
     trustFactVoice: set.authority !== 'first-party-website',
   });
+
   const findings: CopyFinding[] = [];
+  const skeleton = buildSkeleton(spec, result, support, findings);
+  const slots = allSlots(skeleton);
+
+  guardSlots(slots, support, treatment, findings);
+
+  const documentStatements = documentText(spec);
+  let audit = await auditSlots(set, slots, generator, findings, false, documentStatements);
 
   /*
-   * Held aside rather than assembled directly: the semantic audit runs over
-   * everything that survived the deterministic guard, and a field it rejects
-   * must not reach the page even though the guard passed it.
+   * Repair what was rejected, once.
+   *
+   * Dropping a rejected field and falling back to the document was right while
+   * the document was a Growth Engine page with authoritative prose to fall back
+   * TO. Against a fact sheet there is nothing behind it, and the first live run
+   * showed what that costs: the cliché guard correctly refused five of six
+   * bodies, every one fell back to a bare fact restatement, and the page came
+   * out as campaign headings sitting on top of the source document's own
+   * sentences — the exact "website paragraphs rearranged" outcome this phase
+   * exists to avoid.
+   *
+   * So a rejection now asks for a rewrite before it gives up, and says exactly
+   * what was wrong.
+   *
+   * Two rounds, hard-bounded, never a loop. Two because a line rejected by the
+   * guard spends its first round on that and can then be caught by the audit
+   * on the rewrite — which is how the mechanism beat, the one that has to
+   * explain how the product works, ended up empty in both live campaigns.
+   * Whatever still fails falls back as it always did, so the page degrades
+   * toward truth rather than toward a claim nothing supports.
    */
-  const kept = new Map<string, string>();
+  for (let round = 0; round < REPAIR_ROUNDS; round += 1) {
+    const repaired = await repairSlots(set, request, strategy, slots, generator, support, treatment, findings);
 
-  const take = (field: string, candidate: string | null | undefined, key: string): string | undefined => {
-    const value = safeCopy(field, candidate, support, findings, budget(treatment, key));
-
-    if (value) {
-      kept.set(field, value);
-      return value;
+    if (repaired === 0) {
+      break;
     }
 
-    return undefined;
+    audit = await auditSlots(set, slots, generator, findings, audit.performed, documentStatements);
+  }
+
+  const overlay = assemble(skeleton);
+  const accepted = countAccepted(overlay);
+
+  return {
+    overlay,
+    plan: { ...result.campaign, lengthTreatment: treatment },
+    findings,
+    rejected: slots.filter((slot) => slot.text === null).length,
+    accepted,
+    generated: true,
+    audited: audit.performed,
   };
+}
 
-  const overlay: CopyOverlay = { sections: [] };
-  const audited: AuditedField[] = [];
+/* ------------------------------------------------------------------ */
+/* Slots                                                               */
+/* ------------------------------------------------------------------ */
 
+/**
+ * One authored string on its way to the page.
+ *
+ * Held in a flat list so the guard, the audit and the repair pass all operate
+ * on the same objects, and the overlay is assembled from whatever survives.
+ * Before this, each stage patched a half-built overlay and the repair pass had
+ * nowhere to put a corrected line.
+ */
+interface Slot {
+  field: string;
+  budget: string;
+
+  /** What the model produced. Kept so a repair can be asked for. */
+  raw: string;
+
+  /** The text that will reach the page, or null once something rejected it. */
+  text: string | null;
+  reasons: string[];
+}
+
+interface SectionSkeleton {
+  index: number;
+  intent?: string;
+  factRefs: string[];
+  eyebrow: Slot | null;
+  heading: Slot | null;
+  body: Slot | null;
+  items: Slot[];
+  qa: Array<{ question: Slot; answer: Slot }>;
+}
+
+interface Skeleton {
+  headline: Slot | null;
+  subheadline: Slot | null;
+  audience: Slot | null;
+  pageFactRefs: string[];
+  sections: SectionSkeleton[];
+}
+
+function slot(field: string, budget: string, raw: string | null | undefined): Slot | null {
+  const text = typeof raw === 'string' ? raw.trim() : '';
+
+  return text ? { field, budget, raw: text, text, reasons: [] } : null;
+}
+
+function buildSkeleton(
+  spec: PageSpec,
+  result: AuthorshipResult,
+  support: SupportContext,
+  findings: CopyFinding[],
+): Skeleton {
   findings.push(...guardFactRefs('page', result.pageFactRefs ?? [], support));
-  overlay.factRefs = (result.pageFactRefs ?? []).filter((ref) => support.knownRefs.has(ref));
 
-  overlay.headline = take('page.headline', result.headline, 'headline');
-  overlay.subheadline = take('page.subheadline', result.subheadline, 'subheadline');
-  overlay.audience = take('page.audience', result.audience, 'eyebrow');
+  const sections: SectionSkeleton[] = [];
 
   for (const candidate of result.sections ?? []) {
     const index = candidate.index;
@@ -376,93 +467,252 @@ export async function authorCampaignCopy(
 
     findings.push(...guardFactRefs(`section.${index}`, candidate.factRefs ?? [], support));
 
-    const entry: SectionCopy = {
+    sections.push({
       index,
-      factRefs: (candidate.factRefs ?? []).filter((ref) => support.knownRefs.has(ref)),
       intent: candidate.intent?.trim() || undefined,
-    };
+      factRefs: (candidate.factRefs ?? []).filter((ref) => support.knownRefs.has(ref)),
+      eyebrow: slot(`section.${index}.eyebrow`, 'eyebrow', candidate.eyebrow),
+      heading: slot(`section.${index}.heading`, 'heading', candidate.heading),
+      body: slot(`section.${index}.body`, 'body', candidate.body),
+      items: (candidate.items ?? [])
+        .map((item, position) => slot(`section.${index}.item.${position}`, 'item', item))
+        .filter((entry): entry is Slot => entry !== null),
+      qa: (candidate.qa ?? [])
+        .map((pair, position) => {
+          const question = slot(`section.${index}.qa.${position}.question`, 'heading', pair?.question);
+          const answer = slot(`section.${index}.qa.${position}.answer`, 'qa', pair?.answer);
 
-    entry.eyebrow = take(`section.${index}.eyebrow`, candidate.eyebrow, 'eyebrow');
-    entry.heading = take(`section.${index}.heading`, candidate.heading, 'heading');
-    entry.body = take(`section.${index}.body`, candidate.body, 'body');
-
-    const items = (candidate.items ?? [])
-      .map((item, position) => take(`section.${index}.item.${position}`, item, 'item'))
-      .filter((item): item is string => Boolean(item));
-
-    if (items.length > 0) {
-      entry.items = items;
-    }
-
-    const qa: Array<{ question: string; answer: string }> = [];
-
-    (candidate.qa ?? []).forEach((pair, position) => {
-      const field = `section.${index}.qa.${position}`;
-      const before = findings.length;
-      const question = safeCopy(field, pair?.question, support, findings, budget(treatment, 'heading'));
-      const answer = safeCopy(field, pair?.answer, support, findings, budget(treatment, 'qa'));
-
-      /* A question without its answer is worse than no question at all. */
-      if (question && answer && findings.length === before) {
-        qa.push({ question, answer });
-        kept.set(field, `${question} ${answer}`);
-      }
+          return question && answer ? { question, answer } : null;
+        })
+        .filter((entry): entry is { question: Slot; answer: Slot } => entry !== null),
     });
+  }
 
-    if (qa.length > 0) {
-      entry.qa = qa;
+  return {
+    headline: slot('page.headline', 'headline', result.headline),
+    subheadline: slot('page.subheadline', 'subheadline', result.subheadline),
+    audience: slot('page.audience', 'eyebrow', result.audience),
+    pageFactRefs: (result.pageFactRefs ?? []).filter((ref) => support.knownRefs.has(ref)),
+    sections,
+  };
+}
+
+function allSlots(skeleton: Skeleton): Slot[] {
+  const out: Slot[] = [];
+
+  for (const entry of [skeleton.headline, skeleton.subheadline, skeleton.audience]) {
+    if (entry) {
+      out.push(entry);
     }
+  }
+
+  for (const section of skeleton.sections) {
+    for (const entry of [section.eyebrow, section.heading, section.body]) {
+      if (entry) {
+        out.push(entry);
+      }
+    }
+
+    out.push(...section.items);
+
+    for (const pair of section.qa) {
+      out.push(pair.question, pair.answer);
+    }
+  }
+
+  return out;
+}
+
+function guardSlots(slots: Slot[], support: SupportContext, treatment: LengthTreatment, findings: CopyFinding[]): void {
+  for (const entry of slots) {
+    if (entry.text === null) {
+      continue;
+    }
+
+    const issues = guardCopy(entry.field, entry.text, support, budget(treatment, entry.budget));
+
+    if (issues.length > 0) {
+      findings.push(...issues);
+      entry.reasons = issues.map((issue) => issue.detail);
+      entry.text = null;
+    }
+  }
+}
+
+async function auditSlots(
+  set: ApprovedFactSet,
+  slots: Slot[],
+  generator: StructuredTextGenerator,
+  findings: CopyFinding[],
+  performedBefore = false,
+  documentStatements: readonly string[] = [],
+): Promise<{ performed: boolean }> {
+  const audited: AuditedField[] = slots
+    .filter((entry): entry is Slot & { text: string } => entry.text !== null)
+    .map((entry) => ({ field: entry.field, text: entry.text }));
+
+  const audit = await auditClaims(set.facts, audited, generator, documentStatements);
+  findings.push(...audit.findings);
+
+  for (const entry of slots) {
+    if (entry.text !== null && audit.rejectedFields.has(entry.field)) {
+      entry.reasons = audit.findings.filter((issue) => issue.field === entry.field).map((issue) => issue.detail);
+      entry.text = null;
+    }
+  }
+
+  return { performed: audit.performed || performedBefore };
+}
+
+const REPAIR_SCHEMA = {
+  type: 'object',
+  additionalProperties: false,
+  required: ['repairs'],
+  properties: {
+    repairs: {
+      type: 'array',
+      items: {
+        type: 'object',
+        additionalProperties: false,
+        required: ['field', 'text'],
+        properties: {
+          field: { type: 'string', description: 'The field id exactly as given.' },
+          text: { type: 'string', description: 'The rewritten line.' },
+        },
+      },
+    },
+  },
+} as const;
+
+const REPAIR_SYSTEM = `You are the copywriter, fixing your own lines.
+
+Each line below was rejected, and you are told exactly why. Rewrite each one so
+it says the same thing without the problem. Keep the voice, the specificity and
+the persuasive intent — this is a rewrite, not a retreat into something bland.
+
+If a line was rejected for a banned word, find a better way to say it. The ban
+exists because those words make copy sound like every other page on the
+internet, so reaching for a synonym of the same cliché is not a fix.
+
+If a line was rejected for an unsupported claim, say less rather than softening
+it into vagueness. Drop the unsupported part and keep what the facts do carry.
+
+Never introduce a number, price, statistic, guarantee, award, rating, review or
+customer result that no approved fact states.
+
+Sentence case. Plain nouns and verbs. Concrete over abstract.
+
+Return only the fields you were given.`;
+
+/**
+ * Ask the writer to fix its own rejected lines. One round, never a loop.
+ *
+ * Returns how many lines came back and survived, so the caller knows whether a
+ * second audit pass is worth making.
+ */
+async function repairSlots(
+  set: ApprovedFactSet,
+  request: InterpretedRequest,
+  strategy: CreativeStrategy,
+  slots: Slot[],
+  generator: StructuredTextGenerator,
+  support: SupportContext,
+  treatment: LengthTreatment,
+  findings: CopyFinding[],
+): Promise<number> {
+  const broken = slots.filter((entry) => entry.text === null && entry.reasons.length > 0);
+
+  if (broken.length === 0) {
+    return 0;
+  }
+
+  let result: { repairs: Array<{ field: string; text: string }> };
+
+  try {
+    result = await generator.generate({
+      system: REPAIR_SYSTEM,
+      user: [
+        `CAMPAIGN: ${request.userInstruction || request.objective}`,
+        `Tone ${request.tone}; copy style ${strategy.copyStyle}; narrative ${strategy.narrativeAngle}.`,
+        '',
+        'APPROVED FACTS — still the only things you may assert:',
+        set.facts.map((fact) => `${fact.ref} (${fact.kind}): ${fact.text}`).join('\n'),
+        '',
+        'REJECTED LINES:',
+        JSON.stringify(
+          broken.map((entry) => ({ field: entry.field, text: entry.raw, problems: entry.reasons })),
+          null,
+          2,
+        ),
+      ].join('\n'),
+      schema: REPAIR_SCHEMA as unknown as Record<string, unknown>,
+      schemaName: 'copy_repair',
+      temperature: 0.8,
+    });
+  } catch {
+    /* A failed repair leaves the page exactly as it would have been. */
+    return 0;
+  }
+
+  const byField = new Map(broken.map((entry) => [entry.field, entry]));
+  let recovered = 0;
+
+  for (const repair of result.repairs ?? []) {
+    const entry = byField.get(repair.field);
+    const text = repair.text?.trim();
+
+    if (!entry || !text) {
+      continue;
+    }
+
+    const issues = guardCopy(entry.field, text, support, budget(treatment, entry.budget));
+
+    if (issues.length > 0) {
+      findings.push(...issues);
+      continue;
+    }
+
+    entry.text = text;
+    entry.reasons = [];
+    recovered += 1;
+  }
+
+  return recovered;
+}
+
+function assemble(skeleton: Skeleton): CopyOverlay {
+  const overlay: CopyOverlay = { sections: [], factRefs: skeleton.pageFactRefs };
+  const value = (entry: Slot | null) => entry?.text ?? undefined;
+
+  overlay.headline = value(skeleton.headline);
+  overlay.subheadline = value(skeleton.subheadline);
+  overlay.audience = value(skeleton.audience);
+
+  for (const section of skeleton.sections) {
+    const items = section.items.map((entry) => entry.text).filter((text): text is string => Boolean(text));
+
+    /* A question without its answer is worse than no question at all. */
+    const qa = section.qa
+      .filter((pair) => pair.question.text && pair.answer.text)
+      .map((pair) => ({ question: pair.question.text!, answer: pair.answer.text! }));
+
+    const entry: SectionCopy = {
+      index: section.index,
+      factRefs: section.factRefs,
+      intent: section.intent,
+      eyebrow: value(section.eyebrow),
+      heading: value(section.heading),
+      body: value(section.body),
+      items: items.length > 0 ? items : undefined,
+      qa: qa.length > 0 ? qa : undefined,
+    };
 
     if (entry.eyebrow || entry.heading || entry.body || entry.items || entry.qa) {
       overlay.sections.push(entry);
     }
   }
 
-  for (const [field, text] of kept) {
-    audited.push({ field, text });
-  }
-
-  const audit = await auditClaims(set.facts, audited, generator);
-  findings.push(...audit.findings);
-
-  const strip = (field: string, value?: string) => (value && audit.rejectedFields.has(field) ? undefined : value);
-
-  overlay.headline = strip('page.headline', overlay.headline);
-  overlay.subheadline = strip('page.subheadline', overlay.subheadline);
-  overlay.audience = strip('page.audience', overlay.audience);
-
-  overlay.sections = overlay.sections
-    .map((entry) => {
-      const next: SectionCopy = { ...entry };
-      next.eyebrow = strip(`section.${entry.index}.eyebrow`, entry.eyebrow);
-      next.heading = strip(`section.${entry.index}.heading`, entry.heading);
-      next.body = strip(`section.${entry.index}.body`, entry.body);
-
-      const items = (entry.items ?? []).filter(
-        (_, position) => !audit.rejectedFields.has(`section.${entry.index}.item.${position}`),
-      );
-      next.items = items.length > 0 ? items : undefined;
-
-      const qa = (entry.qa ?? []).filter(
-        (_, position) => !audit.rejectedFields.has(`section.${entry.index}.qa.${position}`),
-      );
-      next.qa = qa.length > 0 ? qa : undefined;
-
-      return next;
-    })
-    .filter((entry) => entry.eyebrow || entry.heading || entry.body || entry.items || entry.qa);
-
-  const accepted = countAccepted(overlay);
-
-  return {
-    overlay,
-    plan: { ...result.campaign, lengthTreatment: treatment },
-    findings,
-    rejected: kept.size - accepted + countRefFindings(findings),
-    accepted,
-    generated: true,
-    audited: audit.performed,
-  };
+  return overlay;
 }
 
 function countAccepted(overlay: CopyOverlay): number {
@@ -475,8 +725,4 @@ function countAccepted(overlay: CopyOverlay): number {
   }
 
   return total;
-}
-
-function countRefFindings(findings: readonly CopyFinding[]): number {
-  return findings.filter((finding) => finding.code === 'unknown_fact_ref').length;
 }

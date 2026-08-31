@@ -101,6 +101,19 @@ export async function auditClaims(
   facts: readonly ApprovedFact[],
   fields: readonly AuditedField[],
   generator: StructuredTextGenerator | null,
+
+  /**
+   * The document's own authored statements, which are authoritative too.
+   *
+   * Without these the audit and the deterministic guard disagree about what
+   * support means: `copy-guard` counts the PageSpec's own text as supporting
+   * material and the audit did not, so a line resting on the document rather
+   * than on the fact set passed one layer and was killed by the other. A live
+   * med-spa run lost both its mechanism and its limits paragraph that way —
+   * "handles routine enquiries but doesn't provide clinical advice" was
+   * rejected as unsupported while the document said exactly that.
+   */
+  documentStatements: readonly string[] = [],
 ): Promise<ClaimAuditResult> {
   const empty: ClaimAuditResult = { rejectedFields: new Set(), findings: [], performed: false };
 
@@ -116,10 +129,17 @@ export async function auditClaims(
       user: [
         'APPROVED FACTS:',
         facts.map((fact) => `- (${fact.kind}) ${fact.text}`).join('\n'),
+        documentStatements.length > 0
+          ? `\nTHE SOURCE DOCUMENT ALSO STATES THESE, AND THEY ARE EQUALLY AUTHORITATIVE:\n${documentStatements
+              .map((statement) => `- ${statement}`)
+              .join('\n')}`
+          : '',
         '',
         'FIELDS:',
         JSON.stringify(fields, null, 2),
-      ].join('\n'),
+      ]
+        .filter(Boolean)
+        .join('\n'),
       schema: AUDIT_SCHEMA as unknown as Record<string, unknown>,
       schemaName: 'claim_audit',
       temperature: 0,

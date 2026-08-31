@@ -133,6 +133,32 @@ describe('the guard checks claims, not wording', () => {
     expect(findings.some((f) => f.code === 'novel_currency' || f.code === 'novel_number')).toBe(true);
   });
 
+  /*
+   * From a live law-firm run: the model wrote "all data is encrypted during
+   * transit and at rest, compliant with GDPR and privacy laws" against a fact
+   * set that says nothing about either, and the semantic audit let it through.
+   */
+  it('rejects an invented regulatory or security claim', () => {
+    for (const claim of [
+      'All data is encrypted in transit and at rest.',
+      'Fully compliant with GDPR and privacy laws.',
+      'HIPAA compliant from day one.',
+      'SOC 2 certified infrastructure.',
+      'Bank-level security on every call.',
+    ]) {
+      expect(
+        guardCopy('h', claim, support).some((f) => f.code === 'evidence_claim'),
+        claim,
+      ).toBe(true);
+    }
+  });
+
+  it('permits a regulatory term an approved fact actually states', () => {
+    const certified = supportContext([{ ref: 'f_x', kind: 'product', text: 'The platform is HIPAA compliant.' }], []);
+
+    expect(guardCopy('h', 'It is HIPAA compliant.', certified)).toEqual([]);
+  });
+
   it('still rejects fabricated evidence, testimonials and proof', () => {
     for (const claim of [
       'Clinically proven to book more consultations.',
@@ -157,6 +183,20 @@ describe('the guard checks claims, not wording', () => {
       expect(
         guardCopy('h', cliche, support).some((f) => f.code === 'cliche'),
         cliche,
+      ).toBe(true);
+    }
+  });
+
+  /*
+   * Two live campaigns for different verticals both headlined "never miss a
+   * call" — the same promise with different photography, which is the failure
+   * this differentiation standard exists to catch.
+   */
+  it('rejects the generic promise both verticals collapsed onto', () => {
+    for (const line of ['Never miss a call again.', 'Never miss another lead.', 'It never misses a client.']) {
+      expect(
+        guardCopy('h', line, support).some((f) => f.code === 'cliche'),
+        line,
       ).toBe(true);
     }
   });
@@ -229,6 +269,30 @@ describe('the claim audit', () => {
     const result = await auditClaims(MED_SPA_BRIEF_FACTS.facts, [{ field: 'a', text: 'b' }], failing);
 
     expect(result.performed).toBe(false);
+  });
+
+  /*
+   * The audit and the deterministic guard must agree on what support means. A
+   * live run lost two paragraphs because the guard counted the document's own
+   * text and the audit did not.
+   */
+  it('is shown the document’s own statements as authoritative', async () => {
+    const seen: string[] = [];
+    const capturing: StructuredTextGenerator = {
+      provider: 'stub',
+      model: 'stub/1',
+      async generate<T>(request: { user: string }) {
+        seen.push(request.user);
+        return NO_UNSUPPORTED as T;
+      },
+    };
+
+    await auditClaims(MED_SPA_BRIEF_FACTS.facts, [{ field: 'a', text: 'b' }], capturing, [
+      'Calls arrive while the team is with clients.',
+    ]);
+
+    expect(seen[0]).toContain('EQUALLY AUTHORITATIVE');
+    expect(seen[0]).toContain('Calls arrive while the team is with clients.');
   });
 
   it('ignores a verdict about a field it was never given', async () => {
