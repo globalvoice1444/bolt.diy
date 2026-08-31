@@ -50,6 +50,20 @@ function renderActions(spec: PageSpec): string {
  * generated creative never enters the PageSpec, and its media origin is
  * governed by media trust rather than by navigation trust.
  */
+/**
+ * Renderer-local presentation copy.
+ *
+ * Structurally unable to address the disclosure, the CTAs or Partner
+ * identity: those fields simply do not exist here, so no overlay can reach
+ * them. Absent fields fall back to the PageSpec, which remains untouched.
+ */
+export interface CopyText {
+  headline?: string;
+  subheadline?: string;
+  audience?: string;
+  sections: ReadonlyArray<{ index: number; eyebrow?: string; heading?: string; body?: string }>;
+}
+
 export interface GeneratedMedia {
   assetNeedId: string;
   url: string;
@@ -63,37 +77,47 @@ function renderAssetImage(asset: { url: string; alt: string }, className: string
   return `<figure class="${className}"><img ${attr('src', asset.url)} ${attr('alt', asset.alt)}${loading}></figure>`;
 }
 
-function renderHead(section: PageSpecSection, presentation: SectionPresentation, showIndex: boolean): string {
+function renderHead(
+  section: PageSpecSection,
+  presentation: SectionPresentation,
+  showIndex: boolean,
+  copy?: { eyebrow?: string; heading?: string },
+): string {
   const parts: string[] = [];
 
   if (showIndex) {
     parts.push(`<span class="index-mark" aria-hidden="true">${ordinal(presentation.sourceIndex)}</span>`);
   }
 
-  if (section.eyebrow) {
-    parts.push(`<p class="eyebrow">${escapeHtml(section.eyebrow)}</p>`);
+  const eyebrow = copy?.eyebrow ?? section.eyebrow;
+  const heading = copy?.heading ?? section.heading;
+
+  if (eyebrow) {
+    parts.push(`<p class="eyebrow">${escapeHtml(eyebrow)}</p>`);
   }
 
-  if (section.heading) {
-    parts.push(`<h2 class="section-heading">${escapeHtml(section.heading)}</h2>`);
+  if (heading) {
+    parts.push(`<h2 class="section-heading">${escapeHtml(heading)}</h2>`);
   }
 
   return parts.length > 0 ? `<div class="section__head">${parts.join('')}</div>` : '';
 }
 
-function renderBody(section: PageSpecSection, presentation: SectionPresentation): string {
-  if (!section.body) {
+function renderBody(section: PageSpecSection, presentation: SectionPresentation, override?: string): string {
+  const body = override ?? section.body;
+
+  if (!body) {
     return '';
   }
 
   if (presentation.layout === 'pull-quote') {
-    return `<blockquote class="pull-quote">${escapeHtml(section.body)}</blockquote>`;
+    return `<blockquote class="pull-quote">${escapeHtml(body)}</blockquote>`;
   }
 
   /* A drop cap needs a paragraph to sit in; short copy is marked so it is skipped. */
-  const long = section.body.length >= 180 ? ' prose--long' : '';
+  const long = body.length >= 180 ? ' prose--long' : '';
 
-  return `<div class="prose${long}"><p class="section-body">${escapeHtml(section.body)}</p></div>`;
+  return `<div class="prose${long}"><p class="section-body">${escapeHtml(body)}</p></div>`;
 }
 
 /**
@@ -192,6 +216,7 @@ function renderSection(
   presentation: SectionPresentation,
   showIndex: boolean,
   media: ReadonlyMap<string, GeneratedMedia>,
+  copy?: CopyText,
 ): string {
   const section = spec.sections[presentation.sourceIndex];
 
@@ -199,11 +224,13 @@ function renderSection(
     return '';
   }
 
+  const sectionCopy = copy?.sections.find((item) => item.index === presentation.sourceIndex);
+
   const generated = presentation.generatedAssetNeedId ? media.get(presentation.generatedAssetNeedId) : undefined;
 
   let splitFlavour = 'none';
-  const head = renderHead(section, presentation, showIndex);
-  const body = renderBody(section, presentation);
+  const head = renderHead(section, presentation, showIndex, sectionCopy);
+  const body = renderBody(section, presentation, sectionCopy?.body);
   const items = renderItems(section, presentation);
   const qa = renderQa(section, presentation);
   const image = section.asset ?? generated;
@@ -278,6 +305,7 @@ function renderHero(
   spec: PageSpec,
   plan: CreativePresentationPlan,
   generatedMedia: ReadonlyMap<string, GeneratedMedia>,
+  copyText?: CopyText,
 ): string {
   const identity = [spec.partner.displayName, spec.partner.businessName].filter(Boolean).join(' · ');
   const heroAsset =
@@ -290,9 +318,9 @@ function renderHero(
 
   const copy = [
     '<div class="hero__copy">',
-    `<p class="eyebrow audience">${escapeHtml(spec.page.audience)}</p>`,
-    `<h1>${escapeHtml(spec.page.headline)}</h1>`,
-    `<p class="lede">${escapeHtml(spec.page.subheadline)}</p>`,
+    `<p class="eyebrow audience">${escapeHtml(copyText?.audience ?? spec.page.audience)}</p>`,
+    `<h1>${escapeHtml(copyText?.headline ?? spec.page.headline)}</h1>`,
+    `<p class="lede">${escapeHtml(copyText?.subheadline ?? spec.page.subheadline)}</p>`,
     spec.partner.introduction ? `<p class="introduction">${escapeHtml(spec.partner.introduction)}</p>` : '',
     renderActions(spec),
     '</div>',
@@ -311,12 +339,12 @@ function renderHero(
   ].join('');
 }
 
-function renderClosing(spec: PageSpec, plan: CreativePresentationPlan): string {
+function renderClosing(spec: PageSpec, plan: CreativePresentationPlan, copyText?: CopyText): string {
   const { treatment } = plan.closing;
   const copy = [
-    `<p class="eyebrow">${escapeHtml(spec.page.audience)}</p>`,
-    `<h2 class="section-heading">${escapeHtml(spec.page.headline)}</h2>`,
-    `<p class="section-body">${escapeHtml(spec.page.subheadline)}</p>`,
+    `<p class="eyebrow">${escapeHtml(copyText?.audience ?? spec.page.audience)}</p>`,
+    `<h2 class="section-heading">${escapeHtml(copyText?.headline ?? spec.page.headline)}</h2>`,
+    `<p class="section-body">${escapeHtml(copyText?.subheadline ?? spec.page.subheadline)}</p>`,
   ].join('');
 
   const inner =
@@ -354,12 +382,13 @@ export function composeDocument(
   plan: CreativePresentationPlan,
   direction: CreativeDirection,
   generatedMedia: readonly GeneratedMedia[] = [],
+  copy?: CopyText,
 ): string {
   const mediaByNeed = new Map(generatedMedia.map((item) => [item.assetNeedId, item]));
   const identity = [spec.partner.displayName, spec.partner.businessName].filter(Boolean).join(' · ');
   const showIndex = direction.id === 'editorial-luxe' || direction.id === 'service-bold';
   const sections = plan.sections
-    .map((presentation) => renderSection(spec, presentation, showIndex, mediaByNeed))
+    .map((presentation) => renderSection(spec, presentation, showIndex, mediaByNeed, copy))
     .join('');
 
   return [
@@ -380,10 +409,10 @@ export function composeDocument(
     identity ? `<span class="identity">${escapeHtml(identity)}</span>` : '',
     '</div></header>',
     '<main id="content">',
-    renderHero(spec, plan, mediaByNeed).replace('<h1>', '<h1 id="page-headline">'),
+    renderHero(spec, plan, mediaByNeed, copy).replace('<h1>', '<h1 id="page-headline">'),
     sections,
     renderDisclosure(spec, 'inline'),
-    renderClosing(spec, plan),
+    renderClosing(spec, plan, copy),
     '</main>',
     '<footer class="site-footer"><div class="shell">',
     identity ? `<strong>${escapeHtml(identity)}</strong>` : '',

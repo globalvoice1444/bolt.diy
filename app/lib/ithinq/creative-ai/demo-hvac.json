@@ -1,0 +1,127 @@
+{
+  "specVersion": "1.0",
+  "page": {
+    "reference": "spec:hvac:missed-calls-demo",
+    "origin": "generated",
+    "name": "HVAC \u2014 Calls that go to voicemail",
+    "audience": "Owner or dispatcher running a small HVAC company",
+    "headline": "The furnace call came in at 4:50pm and rang out",
+    "subheadline": "An AI Voice Assistant that answers when the crew is on a job, takes the details a quote needs, and keeps the callback moving.",
+    "vertical": "hvac",
+    "campaign": "demo:hvac:missed-calls",
+    "situation": "Calls arrive while technicians are on site.",
+    "awareness": "problem-aware",
+    "sophistication": 2,
+    "templateKey": null
+  },
+  "partner": {
+    "displayName": "Example Partner",
+    "businessName": "Example Partner Ltd",
+    "introduction": null
+  },
+  "ctas": {
+    "primary": {
+      "label": "Request a quote",
+      "url": "https://ithinq.ai/demo?ref=8f14e45f-ce7a-4a5b-9f2d-0c1b2a3d4e5f",
+      "role": "primary",
+      "carriesAttribution": true
+    },
+    "secondary": {
+      "label": "See iThinq AI",
+      "url": "https://ithinq.ai/?ref=8f14e45f-ce7a-4a5b-9f2d-0c1b2a3d4e5f",
+      "role": "secondary"
+    }
+  },
+  "disclosure": {
+    "text": "This page is shared by an independent iThinq AI Partner, who may be compensated if you become a customer.",
+    "placement": "footer"
+  },
+  "policy": {
+    "allowedLinkHosts": ["ithinq.ai", "partners.ithinq.ai"]
+  },
+  "sections": [
+    {
+      "kind": "scenario",
+      "purpose": "create_recognition",
+      "emphasis": "lead",
+      "provenance": {
+        "factRefs": []
+      },
+      "eyebrow": "The situation",
+      "heading": "Late afternoon, everyone is on a job",
+      "body": "The furnace call came in at 4:50pm and rang out"
+    },
+    {
+      "kind": "pain",
+      "purpose": "intensify_problem",
+      "emphasis": "support",
+      "provenance": {
+        "factRefs": []
+      },
+      "eyebrow": "What it costs",
+      "heading": "What a missed call costs",
+      "body": "Calls arrive while technicians are on site. Nobody is in the office to take the details. By the evening the job has been booked by whoever picked up first."
+    },
+    {
+      "kind": "mechanism",
+      "purpose": "explain_mechanism",
+      "emphasis": "lead",
+      "provenance": {
+        "factRefs": ["f_75d60d5805ea05c7145b400281cc957242de5fa8e63cf727bf73aa830424a397"]
+      },
+      "eyebrow": "How it works",
+      "heading": "How it works",
+      "body": "Answers inbound calls. Takes the caller through the questions a quote needs. Hands the details back in a form the office can act on. Asks the same questions in the same order whoever is on shift. Answers calls outside opening hours, where your setup supports it. Does not replace the people who do the work."
+    },
+    {
+      "kind": "vertical_fit",
+      "purpose": "establish_fit",
+      "emphasis": "support",
+      "provenance": {
+        "factRefs": ["f_e576f6b02ad7e84384e8847a88a76239fb3132f2080ddc7552a120868dec7097"]
+      },
+      "eyebrow": "Fit",
+      "heading": "This suits you if",
+      "items": [
+        "Calls arrive while technicians are on site",
+        "Nobody is in the office to answer",
+        "Quotes depend on details taken over the phone",
+        "Callbacks slip until the end of the day"
+      ]
+    },
+    {
+      "kind": "vertical_fit",
+      "purpose": "reduce_risk",
+      "emphasis": "support",
+      "provenance": {
+        "factRefs": ["f_f6db12335f0bf1815420121694e44b746f06900a93cc9cfaf22b612fa056a6b1"]
+      },
+      "eyebrow": "Fit",
+      "heading": "This is not for you if",
+      "items": [
+        "You already have office cover that answers every call",
+        "You want emergency dispatch decisions made for you"
+      ]
+    },
+    {
+      "kind": "faq",
+      "purpose": "handle_objection",
+      "emphasis": "support",
+      "provenance": {
+        "factRefs": ["f_48fb2b5e18e254181112f15a27c2af6505ca58fdf6f67b49a0fc695866695895"]
+      },
+      "eyebrow": "Questions",
+      "heading": "Common questions",
+      "qa": [
+        {
+          "question": "If they say it sounds too technical",
+          "answer": "From the caller's side it is an ordinary phone call, and nobody on your team has to learn a new system to get the message."
+        },
+        {
+          "question": "If they say not right now",
+          "answer": "That is fair. The calls that ring out today are the ones worth looking at first."
+        }
+      ]
+    }
+  ]
+}
