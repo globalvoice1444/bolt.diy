@@ -69,11 +69,22 @@ export const DEFAULT_WEBSITE_SOURCE: WebsiteSourceConfig = {
 };
 
 /*
- * Deliberately absent: /login, /demo, /blog, /documentation, /privacy-policy
- * and /terms-of-service. Authentication and legal pages carry no product fact,
- * and a blog is a stream of opinion and announcement rather than the settled
- * claims a campaign should rest on. `robots.txt` disallows only /private/,
- * which is not among these.
+ * The list above is a curation decision, not a limit on what the corpus may
+ * contain. Any approved first-party page belongs here if it carries product
+ * knowledge — product, solution, feature, industry, service and FAQ pages, and
+ * equally a blog post, knowledge-base article or resource page that states
+ * something settled about what the product does.
+ *
+ * Adding one is a line in this array, or `ITHINQ_WEBSITE_PATHS`. Nothing
+ * downstream changes: extraction, provenance, the snapshot, relevance
+ * selection, the campaign author and the renderer neither know nor care how
+ * many pages were read.
+ *
+ * Currently absent by choice rather than by rule: /login, /demo, /documentation,
+ * /privacy-policy and /terms-of-service, which carry no product fact; and
+ * /blog, whose index is a list of links rather than claims — individual posts
+ * are fair game once someone approves them. `robots.txt` disallows only
+ * /private/, which is not among any of these.
  */
 
 /**

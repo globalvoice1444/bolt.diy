@@ -52,6 +52,14 @@ ithinq.ai is a Vite/React SPA: the served HTML is a shell with one module script
 
 The renderer lives in the **tooling layer** (`scripts/lib/rendered-fetch.mjs`), injected through the `fetchImpl` seam the library already had. The fact library keeps a plain `fetch` and stays unit-testable against HTML fixtures with no browser near it; only the refresh command ever needs a renderer, and campaign generation needs neither. Rendering never bypasses the ceiling: when a page settles on a different URL, the renderer returns a redirect rather than the content, so the library's own approval check decides whether to follow.
 
+### The corpus is the approved site, not the homepage
+
+The source is a configured list of approved first-party pages — currently fifteen, spanning the homepage, product, feature, pricing and solution pages, and six industry pages (`/ai-voice-assistant-for-medspas`, `/ai-receptionist-for-law-firms`, `/ai-receptionist-for-real-estate`, and others). The per-vertical pages are what make a per-market campaign possible at all.
+
+**The list is a curation decision, not a limit.** Any approved first-party page that carries product knowledge belongs in it, including a blog post, knowledge-base article or resource page that states something settled about what the product does. Adding one is a line in `DEFAULT_WEBSITE_SOURCE.pages`, or the `ITHINQ_WEBSITE_PATHS` environment variable — nothing downstream changes, because extraction, provenance, the snapshot, relevance selection, the campaign author and the renderer neither know nor care how many pages were read.
+
+What stays closed is the *host* ceiling, not the page list.
+
 ### Extraction is deterministic
 
 A model reading the site and deciding what is true would put a generative step between the company and its own claims — the exact step this architecture exists to keep out. So extraction is dull and readable: headings, paragraphs, list items, published Q&A and JSON-LD `FAQPage` entries, normalised, classified by the shape of the statement, each carrying the page and the wording it came from.
