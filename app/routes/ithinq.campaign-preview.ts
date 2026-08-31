@@ -1,8 +1,9 @@
-import type { LoaderFunctionArgs } from '@remix-run/cloudflare';
+import type { LoaderFunctionArgs } from '@remix-run/node';
 import { demoSpec } from '~/lib/ithinq/creative-ai/demo-specs';
 import { compilePageSpecToProjectManifest, inlineDocumentRuntime } from '~/lib/ithinq/pagespec';
 import { campaignRenderInputs, runCampaign } from '~/lib/ithinq/creative-ai';
 import { DEFAULT_BRIEF } from '~/lib/ithinq/creative-ai/briefs';
+import { getRuntimeEnv } from '~/lib/ithinq/runtime-env';
 
 /** Renders the page produced by the full plain-language campaign pipeline. */
 export async function loader({ request, context }: LoaderFunctionArgs) {
@@ -19,7 +20,7 @@ export async function loader({ request, context }: LoaderFunctionArgs) {
 
   const demo = demoSpec(specId);
   const spec = demo.spec;
-  const env = (context?.cloudflare?.env ?? {}) as unknown as Record<string, string | undefined>;
+  const env = getRuntimeEnv(context);
   const run = await runCampaign(spec, { userInstruction: instruction }, { env, factSet: demo.factSet });
   const { copy, generatedMedia } = campaignRenderInputs(run);
 

@@ -1,55 +1,47 @@
 # Deploying the Bolt creative engine to Render
 
-Status: **preparation only. Nothing is deployed, and the app cannot be deployed to Render as it stands.**
+Status: **the runtime is migrated and verified locally. Nothing is deployed.**
 
 This records what the application actually needs at runtime, what the blocker is, and what the Render service looks like once the blocker is cleared. It is written from measurements against the merged `main`, not from reading the code and guessing.
 
-## The blocker, first
+## What was wrong, and what was done
 
-**The application does not run under its own configured production start command.** `pnpm start` runs `wrangler pages dev ./build/client`, which executes the app in workerd, Cloudflare's Workers runtime. Every route returns 500 there — including `/api/health` and even `/favicon.svg`:
+The repo targeted Cloudflare Pages and **did not run under its own configured production start command**. `wrangler pages dev` executes the app in workerd, where every route returned 500 — `/api/health` and `/favicon.svg` included:
 
 ```
 EvalError: Code generation from strings disallowed for this context
-    at Ajv2020.compileSchema (ajv/lib/compile/index.ts:171)
+    at Ajv2020.compileSchema
 ```
 
-`pagespec/validator.ts` compiles the PageSpec JSON Schema with Ajv at **module scope**. Ajv builds validators by generating code at runtime, which Workers forbid. Remix bundles every route into one server module, so the throw happens on import and takes the whole app down rather than just the pages that validate a PageSpec.
+`pagespec/validator.ts` compiles the PageSpec schema with Ajv at module scope; Ajv generates validator code at runtime and Workers forbid it. Remix bundles every route into one server module, so the throw happened on import and took the whole app down.
 
-**And the same build cannot run under Node either.** Importing `build/server/index.js` in Node fails before any request:
+The same build could not run under Node either — `entry.server.tsx` imported `renderToReadableStream` from `react-dom/server`, which resolves to the CommonJS Node build that does not export it.
 
-```
-SyntaxError: Named export 'renderToReadableStream' not found.
-The requested module 'react-dom/server' is a CommonJS module
-```
+Node was the right target regardless: the engine writes generated imagery and the fact snapshot to disk, and Workers have no filesystem.
 
-`entry.server.tsx` uses the Web-streams renderer that Workers provide and Node's default `react-dom/server` export does not.
+### The migration
 
-So the app currently targets Cloudflare Workers, and the iThinq engine needs Node. The two are mutually exclusive today, and neither actually works: Workers because of Ajv, Node because of the server entry.
-
-## Why Node is the right target
-
-Even with the Ajv problem solved, the engine cannot run on Workers. It writes to the filesystem in two places that Workers do not have:
-
-- `FileSystemAssetStore` → `.data/ithinq-generated/` (generated imagery)
-- `FileSystemSnapshotStore` → `.data/ithinq-facts/website-snapshot.json` (the approved fact corpus)
-
-Under Node both work, and Ajv compiles normally. Render runs Node. The target is not in doubt; the adapter is missing.
-
-## What clearing the blocker involves
-
-`@remix-run/node` and `@remix-run/serve` are **already dependencies**, so nothing new is installed. What changes is the runtime the app is built and served against:
-
-| | Work |
+| | |
 |---|---|
-| Server entry | `entry.server.tsx` — Node streaming renderer instead of `renderToReadableStream` |
-| Runtime imports | **49 files** import `@remix-run/cloudflare`; 8 are the iThinq routes, 41 are upstream bolt.diy |
-| Load context | **19 files** read `context.cloudflare.env`; on Node this becomes `process.env` or an equivalent load context |
-| Build config | `vite.config.ts` drops `remixCloudflareDevProxy`; `functions/[[path]].ts` and `wrangler.toml` are replaced by a Node server entry |
-| Scripts | `start` becomes a Node server rather than `wrangler pages dev` |
+| Server entry | `renderToReadableStream` now imported from `react-dom/server.browser`, the Web-streams build Node 18+ can run. Streaming behaviour unchanged |
+| Runtime package | 46 files swapped `@remix-run/cloudflare` → `@remix-run/node`. Only `json` and standard types were ever imported, and both packages export them identically |
+| Load context | `load-context.ts` keeps the `context.cloudflare.env` shape and fills it from `process.env`, so ~19 upstream call sites did not have to change |
+| Env access | `getRuntimeEnv(context)` is the single reconciliation point, used by the iThinq routes |
+| Retired | `functions/[[path]].ts`, `wrangler.toml`, `bindings.sh`, `worker-configuration.d.ts` (its `Env` interface moved to `env.d.ts`, which is what it always actually was) |
+| Scripts | `start` is `remix-serve ./build/server/index.js`; `deploy` (wrangler) and `typegen` removed |
+| Docker | production stage runs `pnpm run start` instead of the Workers emulator |
 
-This is a runtime migration across the whole application, most of it upstream chat code rather than the creative engine. It is a deliberate architectural decision — Cloudflare or Node — and it belongs to whoever owns that call, not to a deployment-prep pass.
+### Two bugs the migration exposed
 
-## The Render service, once Node serving exists
+Neither was visible before, because nothing had ever run the built server: on Workers everything failed earlier, and the tests and the refresh CLI use the real Node `process`.
+
+**The server bundle was importing a browser `process` shim.** `nodePolyfills` was applied to both builds, so the SSR bundle carried `vite-plugin-node-polyfills/shims/process`, whose `cwd()` is `/` and whose `env` is empty. On a real Node server that is quietly catastrophic: the asset store and fact snapshot resolved their roots somewhere that was not the application directory, so generated images wrote nowhere and read back as 404s, and `process.env` would never have yielded the OpenAI key. The polyfills are now scoped to the client build, where they belong.
+
+**`undici` was being pulled into the client bundle.** `@remix-run/node` re-exports it, and Remix pulls every route module into the client graph before tree-shaking removes the server halves; the polyfill plugin then failed resolving undici's `node:util/types`. Node's HTTP client has no place in a browser bundle, so it is aliased to an empty module for the client build only. The server build is untouched and uses the real one.
+
+**Two upstream routes used `Response.json()` as a static helper.** `remix-serve` calls `installGlobals()`, which replaces Node's native `Response` with undici's, and that one has no static `json`. `api.check-env-key` and `api.export-api-keys` now use Remix's own `json()` helper, as every other route in the codebase already did.
+
+## The Render service## The Render service
 
 One **Web Service**. Nothing here needs a second service: the same process serves the frontend, the loaders and the generated-image route, and splitting them would only add a network hop between a page and its own images.
 
@@ -58,7 +50,7 @@ One **Web Service**. Nothing here needs a second service: the same process serve
 | Type | Web Service (Node) |
 | Runtime | Node 22 — `engines` says `>=18.18.0`, the Dockerfile builds on `node:22-bookworm-slim` |
 | Build | `pnpm install --frozen-lockfile && NODE_OPTIONS=--max-old-space-size=8192 pnpm run build` |
-| Start | *(the Node server entry that does not exist yet)* |
+| Start | `pnpm run start` → `remix-serve ./build/server/index.js` |
 | Health check | `/api/health` — already exists, returns `{status, timestamp}`, calls nothing and costs nothing |
 | Output | `build/client` (static) and `build/server` (SSR bundle) |
 | Persistent disk | Not required for smoke deployment. See assets below |
@@ -138,8 +130,26 @@ The flow behind them is: request → `interpretBrief` → `CreativeStrategy` →
 
 `/ithinq/campaign-preview` is already a thin server-rendered seam and is enough to exercise the whole engine over HTTP in a hosted environment. A Partner-facing API belongs to the integration phase, not to deployment prep.
 
+## Verified locally, on the exact Render path
+
+`pnpm run build` then `pnpm run start`, `NODE_ENV=production`, bound to `0.0.0.0`:
+
+| Route | Result |
+|---|---|
+| `/` | 200 |
+| `/api/health` | 200 `{"status":"healthy"}` |
+| `/ithinq/pagespec` | 200 |
+| `/ithinq/campaign-preview` | 200, full campaign rendered |
+| `/favicon.svg` | 200 |
+| `/api/check-env-key?provider=OpenAI` | 200 `{"isSet":true}` — `process.env` reaches server loaders |
+| `/ithinq/generated/:id` | 200, correct content type |
+| `/ithinq/generated/not-hex` | 404, filesystem never touched |
+| `/ithinq/generated/../../package.json` | 404, no traversal |
+
+With `OPENAI_API_KEY` set, one controlled request through the production server ran the whole pipeline live: `gpt-4o` authored the copy, `gpt-image-1` returned two images, the store wrote them to disk as 1536×1024 and 1024×1536 PNGs, and the page served them back. The headline it produced — *"Enhance Every Call with Grace and Accuracy"* — is authored, not the document's own copy, and the Partner disclosure is intact.
+
+No 500s, no Cloudflare context, no Ajv restriction, no missing render API, no Wrangler.
+
 ## Readiness
 
-**Blocked**, on one concrete item: there is no working production server. The configured start command 500s on every route under Workers, and the build will not import under Node.
-
-Everything else is ready. The build succeeds, the health endpoint exists, the environment is three variables, the fact snapshot is reproducible, ephemeral assets are fine for smoke testing, and the secret boundary holds in the built client bundle.
+Ready for a smoke deployment. Durable storage for generated imagery remains the one thing to solve before Partner-facing use.

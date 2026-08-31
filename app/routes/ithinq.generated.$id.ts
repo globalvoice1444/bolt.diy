@@ -1,4 +1,4 @@
-import type { LoaderFunctionArgs } from '@remix-run/cloudflare';
+import type { LoaderFunctionArgs } from '@remix-run/node';
 import { devAssetStore } from '~/lib/ithinq/creative-ai';
 
 /**

@@ -1,8 +1,9 @@
-import { json, type LoaderFunctionArgs, type MetaFunction } from '@remix-run/cloudflare';
+import { json, type LoaderFunctionArgs, type MetaFunction } from '@remix-run/node';
 import { Form, useLoaderData, useNavigation } from '@remix-run/react';
 import { runCampaign } from '~/lib/ithinq/creative-ai';
 import { DEFAULT_BRIEF, DEMO_BRIEFS } from '~/lib/ithinq/creative-ai/briefs';
 import { DEMO_SPECS, demoSpec } from '~/lib/ithinq/creative-ai/demo-specs';
+import { getRuntimeEnv } from '~/lib/ithinq/runtime-env';
 
 export const meta: MetaFunction = () => [
   { title: 'iThinq campaign studio' },
@@ -14,7 +15,7 @@ export async function loader({ request, context }: LoaderFunctionArgs) {
   const brief = url.searchParams.get('brief') || DEFAULT_BRIEF;
   const demo = demoSpec(url.searchParams.get('spec'));
   const spec = demo.spec;
-  const env = (context?.cloudflare?.env ?? {}) as unknown as Record<string, string | undefined>;
+  const env = getRuntimeEnv(context);
 
   const run = await runCampaign(spec, { userInstruction: brief }, { env, factSet: demo.factSet });
 
