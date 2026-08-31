@@ -12,7 +12,9 @@ Phase 4 moves the boundary from **wording** to **claims**.
 Partner request (plain language)
   -> interpretBrief          model-read creative intent
   -> CreativeStrategy        how to communicate
+  -> FactSource              the approved iThinq website, via a refreshed snapshot
   -> ApprovedFactSet         what may be asserted
+  -> relevance selection     the facts this campaign needs
   -> authorCampaignCopy      original campaign copy, with per-beat fact references
   -> copy-guard              figures, money, evidence, references, house style
   -> claim audit             a second model reads the copy back against the facts
@@ -23,6 +25,53 @@ Partner request (plain language)
 ```
 
 Three model calls per campaign, all `gpt-4o` through the Phase 3 provider seam: interpretation, authorship, audit. No new provider, no SDK, server-side only, the key never reaching browser code, a log or an error message.
+
+## Where the facts come from
+
+The primary source is **iThinq's own website**. A Partner should not have to hand-build a fact sheet before they can have a campaign, and the company already publishes what it does, who it is for and what it costs.
+
+```text
+approved first-party pages
+  -> WebsiteFactSource      fetch, parse, extract
+  -> FactSnapshot           .data/, refreshed on command
+  -> ApprovedFactSet        the existing type, unchanged
+  -> relevance selection    the facts this campaign needs
+  -> the Phase 4 authoring pipeline, untouched
+```
+
+Nothing below this line changed to accommodate it. The website populates the same `ApprovedFactSet` the fixtures do, so `copy-guard.ts`, the claim audit, `CopyOverlay`, the presentation plan and the renderer are all exactly as they were.
+
+**Fact trust is its own ceiling.** `validator.ts` already keeps navigation trust and media trust separate, on the reasoning that authorising somewhere to send a person and authorising somewhere to load pixels from must never imply each other. `RENDERER_FACT_HOST_CEILING` is the third and the most consequential: a page that loads a stray pixel is a privacy problem, and a page that repeats a stray sentence as product truth is a false claim made in the Partner's name. The list is closed to `ithinq.ai`, and **environment configuration cannot widen it** — the origin and the paths are overridable, the ceiling is not.
+
+Never a search result, a competitor, a review site or a forum. Not because those are unreliable in general, but because none of them are iThinq speaking about iThinq.
+
+### Reading a client-rendered site
+
+ithinq.ai is a Vite/React SPA: the served HTML is a shell with one module script and no content elements, so a plain HTTP read returns a page that says nothing. Rendering is therefore how a page gets read.
+
+The renderer lives in the **tooling layer** (`scripts/lib/rendered-fetch.mjs`), injected through the `fetchImpl` seam the library already had. The fact library keeps a plain `fetch` and stays unit-testable against HTML fixtures with no browser near it; only the refresh command ever needs a renderer, and campaign generation needs neither. Rendering never bypasses the ceiling: when a page settles on a different URL, the renderer returns a redirect rather than the content, so the library's own approval check decides whether to follow.
+
+### Extraction is deterministic
+
+A model reading the site and deciding what is true would put a generative step between the company and its own claims — the exact step this architecture exists to keep out. So extraction is dull and readable: headings, paragraphs, list items, published Q&A and JSON-LD `FAQPage` entries, normalised, classified by the shape of the statement, each carrying the page and the wording it came from.
+
+Three things the first live ingestion taught, all now enforced in code:
+
+- **Testimonials are not facts.** The run pulled two customer quotes off the site and filed them as capabilities. A customer's reported outcome becoming an approved fact is the worst thing this extractor could do: the campaign author would be licensed to claim customer results, and the evidence guard that exists to stop that would treat them as supported. Borrowed voice — first-person praise naming the product, or anything wrapped in quotation marks — is now refused.
+- **Website hype must not license hype.** The corpus contained "streamline", "transform", "elevate", "revolutionize", "unlock", "cutting-edge" and "effortless". The cliché guard has always exempted terms the source itself uses, which is right for an authored document and wrong for scraped marketing copy — every one of those words would have quietly switched the guard off for itself. `SupportContext` now separates `supported` from `voice`: a website fact can support a claim, and cannot lend its register.
+- **A boundary is a limit, not the word "never".** "It boosts efficiency and never misses a potential client" was classified as a limit — an absolute performance claim filed as a safeguard. The cues now match the negation of a capability rather than any negative word.
+
+### Refreshing
+
+`pnpm ithinq:refresh-facts` rebuilds the snapshot; `--no-render` reads raw HTML for a server-rendered origin. It is a full rebuild rather than a merge: a fact taken off the website is no longer something iThinq says, and carrying it forward because it was true last month is how a system starts making claims its own company has retired.
+
+Facts are content-addressed, so anything still on the site keeps its identity across a refresh and anything reworded gets a new one — the change is visible instead of silent. A page that fails to load is recorded and skipped; one unreachable page narrows what may be claimed and does not stop the others being read.
+
+### Selecting
+
+The whole corpus in every prompt would be wasteful and misleading — a med-spa page shown every fact about every vertical invites the writer to reach for one that does not belong there. Selection is lexical, scoring fact text and derived topics against the request, with a floor per fact kind so the writer always gets a spine: what the product is, who it is for, what it does, and where its limits are. Filling those floors a round at a time rather than a kind at a time matters; filling kind by kind and truncating drops whichever kinds sort last, which is exactly the boundary facts the floor exists to guarantee.
+
+Deliberately not a vector index. The corpus is hundreds of short statements from one company's own site, and an embedding store would be a platform built for a problem this size does not have.
 
 ## The approved fact set
 
@@ -106,6 +155,15 @@ So `effectiveSection()` merges document and overlay, and **both** `planPresentat
 
 ## Demo documents
 
+### Fact sources
+
+| source | authority | used for |
+|---|---|---|
+| `websiteFactSource()` | `first-party-website` | production; reads the snapshot, never the network |
+| `staticFactSource(set)` | `reviewer-fixture` / `document-transcription` | tests, fixtures and the offline demos below |
+
+Both satisfy the same `FactSource` interface and both produce an `ApprovedFactSet`, so choosing between them is configuration. A supplied `factSet` still wins over a `factSource`, so a fixture stays a fixture.
+
 | id | document | fact set | what it proves |
 |---|---|---|---|
 | `med-spa-brief` | plain fact sheet | reviewer fixture, 13 facts | the flagship: a Partner with facts and one sentence gets a campaign |
@@ -128,6 +186,9 @@ Engineering and product review only. No Partner authentication, no production UI
 
 ## Current limitations
 
+- **The website corpus is the company's marketing prose, not a curated fact sheet.** Statements arrive as the site writes them, including its own superlatives. Extraction refuses borrowed voice and will not lend the site's register to the page, but it does not second-guess iThinq's claims about iThinq — those are the company's to make.
+- **Classification is heuristic.** `process` is the fallback and catches a fair share of what are really capability statements. It affects which facts the selector guarantees a slot to, never what may be asserted.
+- **Refresh needs a headless browser** while ithinq.ai is client-rendered. Campaign generation does not, and neither does any test.
 - **The live copy-generation run did not happen.** The configured OpenAI key authenticates (`/v1/models` returns 200) but the account has no credits: every generation call returns `429 insufficient_quota / credit_balance_exhausted`. Every stage is exercised against a stubbed model in tests, and the outage path was verified against the live endpoint — the campaign degraded to the document's own copy and still rendered a page — but **the quality of model-authored copy is unverified**, and so is live imagery for this phase. Phase 3 proved live image generation separately.
 - **The claim audit is a model, not a proof.** It is a second opinion that catches what a lexicon cannot, and it can miss. The deterministic guard is the floor, the audit is the ceiling, and neither is a guarantee.
 - **Boundary facts are protected by prompt and audit, not by a deterministic rule.** "Do not contradict a stated limit" is not something a lexicon can check. The audit is told to treat contradiction of a limit as unsupported.

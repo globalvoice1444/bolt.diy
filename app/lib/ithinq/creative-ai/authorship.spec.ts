@@ -9,6 +9,9 @@ import { auditClaims } from './claim-audit';
 import { documentText } from './facts';
 import { HVAC_FACTS, MED_SPA_BRIEF_FACTS, MED_SPA_CONTRACT_FACTS } from './fact-sets';
 import { DEMO_SPECS, demoSpec } from './demo-specs';
+import { websiteFactSource } from './fact-source';
+import { MemorySnapshotStore, refreshWebsiteFacts } from './website';
+import { INDUSTRIES_HTML, PRICING_HTML, VOICE_ASSISTANT_HTML } from './website/__fixtures__/pages';
 import { campaignRenderInputs, runCampaign } from './campaign';
 import { interpretBrief } from './interpret';
 import { deriveCreativeStrategy } from './strategy';
@@ -809,5 +812,221 @@ describe('every demo document has a fact set behind it', () => {
     expect(demoSpec('hvac').factSet).toBe(HVAC_FACTS);
     expect(demoSpec('med-spa').factSet).toBe(MED_SPA_CONTRACT_FACTS);
     expect(demoSpec('med-spa-brief').factSet).toBe(MED_SPA_BRIEF_FACTS);
+  });
+});
+
+describe('a campaign authored from website-derived facts', () => {
+  const CONFIG = {
+    origin: 'https://ithinq.ai',
+    allowedHosts: ['ithinq.ai', 'www.ithinq.ai'],
+    pages: [
+      { path: '/ai-voice-assistant', topics: ['voice-assistant'] },
+      { path: '/pricing', topics: ['pricing'] },
+      { path: '/industries', topics: ['vertical'] },
+    ],
+  };
+
+  const PAGES: Record<string, string> = {
+    '/ai-voice-assistant': VOICE_ASSISTANT_HTML,
+    '/pricing': PRICING_HTML,
+    '/industries': INDUSTRIES_HTML,
+  };
+
+  const stub = (async (input: RequestInfo | URL) => {
+    const body = PAGES[new URL(String(input)).pathname];
+
+    return body === undefined
+      ? new Response('missing', { status: 404 })
+      : new Response(body, { status: 200, headers: { 'content-type': 'text/html' } });
+  }) as unknown as typeof fetch;
+
+  async function snapshotStore() {
+    const store = new MemorySnapshotStore();
+    await refreshWebsiteFacts({
+      config: CONFIG,
+      store,
+      fetchImpl: stub,
+      now: () => new Date('2026-09-01T00:00:00.000Z'),
+    });
+
+    return store;
+  }
+
+  /**
+   * The end-to-end claim of this phase, with the model stubbed.
+   *
+   * The writer is handed nothing but the fact set the pipeline built, so what
+   * it echoes back is exactly what reached it. If website ingestion, snapshot
+   * reading or selection were broken anywhere along the way, this echo would
+   * come back empty or wrong.
+   */
+  function factEchoWriter(seen: { facts: string[] }): StructuredTextGenerator {
+    let call = 0;
+
+    return {
+      provider: 'stub',
+      model: 'stub-text/1',
+      async generate<T>(request: { user: string }) {
+        call += 1;
+
+        if (call === 1) {
+          return INTERPRETATION as T;
+        }
+
+        if (call === 3) {
+          return NO_UNSUPPORTED as T;
+        }
+
+        seen.facts = request.user
+          .split('\n')
+          .filter((line) => line.startsWith('f_'))
+          .map((line) => line.slice(line.indexOf(': ') + 2));
+
+        return {
+          campaign: PLAN,
+          audience: 'Med spa owners',
+          headline: 'The consultation enquiry that rang out while you were with a client',
+          subheadline: 'Someone answers it, asks what the enquiry needs, and keeps the follow-up moving.',
+          pageFactRefs: [],
+          sections: [],
+        } as T;
+      },
+    };
+  }
+
+  it('hands the campaign author facts read from the approved website', async () => {
+    const seen = { facts: [] as string[] };
+    const store = await snapshotStore();
+
+    const run = await runCampaign(
+      briefDemo.spec,
+      { userInstruction: REQUEST },
+      {
+        factSource: websiteFactSource(store),
+        textGenerator: factEchoWriter(seen),
+        imageGenerator: new PlaceholderImageGenerator(),
+        store: new MemoryStore(),
+        skipImages: true,
+      },
+    );
+
+    expect(run.factSourceId).toBe('ithinq-website');
+    expect(run.factSet.authority).toBe('first-party-website');
+    expect(seen.facts.length).toBeGreaterThan(0);
+    expect(seen.facts.join(' ')).toContain('answers incoming calls');
+    expect(run.copy.generated).toBe(true);
+  });
+
+  it('gives every fact the author saw a traceable first-party source', async () => {
+    const store = await snapshotStore();
+    const set = (await websiteFactSource(store).load())!;
+
+    for (const fact of set.facts) {
+      expect(fact.source?.sourceUrl).toMatch(/^https:\/\/ithinq\.ai\//);
+      expect(fact.source?.sourceHash).toMatch(/^[0-9a-f]{64}$/);
+    }
+  });
+
+  it('lets the author write original wording that appears on no page', async () => {
+    const store = await snapshotStore();
+    const set = (await websiteFactSource(store).load())!;
+    const support = supportContext(set.facts, []);
+
+    /* None of this sentence is on the fixture site; every claim in it is. */
+    const original =
+      'You were with a client when the phone went. Nobody was free. It picks up instead, asks what the enquiry needs, and puts the appointment in the calendar you already use.';
+
+    expect(guardCopy('body', original, support, 900)).toEqual([]);
+  });
+
+  /*
+   * Ingested hype must not switch the cliché guard off. Before voice and
+   * support were separated, a website that says "streamline" licensed the
+   * campaign to say it too.
+   */
+  it('does not let marketing language on the site license it on the page', async () => {
+    const store = await snapshotStore();
+    const set = (await websiteFactSource(store).load())!;
+    const hypey = {
+      ...set,
+      facts: [
+        ...set.facts,
+        { ref: set.facts[0]!.ref, kind: 'capability' as const, text: 'Streamline your entire front desk.' },
+      ],
+    };
+
+    const websiteVoice = supportContext(hypey.facts, [], { trustFactVoice: false });
+    const authoredVoice = supportContext(hypey.facts, [], { trustFactVoice: true });
+
+    expect(guardCopy('h', 'Streamline your front desk.', websiteVoice).some((f) => f.code === 'cliche')).toBe(true);
+    expect(guardCopy('h', 'Streamline your front desk.', authoredVoice)).toEqual([]);
+  });
+
+  it('still supports a factual claim even when it will not lend its voice', async () => {
+    const store = await snapshotStore();
+    const set = (await websiteFactSource(store).load())!;
+    const support = supportContext(set.facts, [], { trustFactVoice: false });
+
+    expect(guardCopy('h', 'Plans start at $149 per month.', support)).toEqual([]);
+  });
+
+  it('still rejects a claim the website does not support', async () => {
+    const store = await snapshotStore();
+    const set = (await websiteFactSource(store).load())!;
+    const support = supportContext(set.facts, []);
+
+    expect(guardCopy('h', 'Rated five-star by 400 clinics.', support).length).toBeGreaterThan(0);
+    expect(guardCopy('h', 'Plans start at $19 per month.', support).some((f) => f.code === 'novel_number')).toBe(true);
+    expect(guardCopy('h', 'Plans start at $149 per month.', support)).toEqual([]);
+  });
+
+  it('leaves the PageSpec artifact untouched by website-derived copy', async () => {
+    const store = await snapshotStore();
+    const seen = { facts: [] as string[] };
+
+    const run = await runCampaign(
+      briefDemo.spec,
+      { userInstruction: REQUEST },
+      {
+        factSource: websiteFactSource(store),
+        textGenerator: factEchoWriter(seen),
+        imageGenerator: new PlaceholderImageGenerator(),
+        store: new MemoryStore(),
+        skipImages: true,
+      },
+    );
+
+    const { manifest } = compilePageSpecToProjectManifest(briefDemo.spec, {
+      direction: run.strategy.directionId,
+      copy: campaignRenderInputs(run).copy,
+    });
+
+    expect(JSON.parse(manifest.files['/pagespec.json'] ?? '{}')).toEqual(JSON.parse(JSON.stringify(briefDemo.spec)));
+
+    const html = manifest.files['/index.html'] ?? '';
+    expect(html).toContain(briefDemo.spec.disclosure.text);
+    expect(html).toContain(briefDemo.spec.ctas.primary.url);
+    expect(html).toContain(briefDemo.spec.partner.displayName!);
+  });
+
+  it('keeps a supplied fixture set in charge when one is given', async () => {
+    const store = await snapshotStore();
+    const seen = { facts: [] as string[] };
+
+    const run = await runCampaign(
+      briefDemo.spec,
+      { userInstruction: REQUEST },
+      {
+        factSet: briefDemo.factSet,
+        factSource: websiteFactSource(store),
+        textGenerator: factEchoWriter(seen),
+        imageGenerator: new PlaceholderImageGenerator(),
+        store: new MemoryStore(),
+        skipImages: true,
+      },
+    );
+
+    expect(run.factSet.authority).toBe('reviewer-fixture');
+    expect(run.factSourceId).toBeNull();
   });
 });

@@ -26,13 +26,36 @@ import { FACT_REFERENCE_PATTERN, isAssertingPurpose, type PageSpec } from '@ithi
  * must never contradict and should reach for when meeting an objection. The
  * prompt says so by name, which it could not do without the classifier.
  */
-export type FactKind = 'capability' | 'boundary' | 'audience' | 'product' | 'process';
+export type FactKind = 'capability' | 'boundary' | 'audience' | 'product' | 'process' | 'pricing';
+
+/**
+ * Where a fact came from, when it is read rather than hand-written.
+ *
+ * The question this has to answer, months later and for any claim on any
+ * generated page, is: which approved page said this, in what words, and when
+ * did we last look? Every field here exists to answer one clause of that and
+ * nothing more.
+ */
+export interface FactProvenance {
+  sourceUrl: string;
+  pageTitle: string | null;
+
+  /** SHA-256 of the exact source wording. Changes when the site's words change. */
+  sourceHash: string;
+  retrievedAt: string;
+
+  /** Retrieval hints for relevance. Never claims, and never shown to a reader. */
+  topics: string[];
+}
 
 export interface ApprovedFact {
   /** `f_` + a full lowercase SHA-256 digest, exactly as the contract requires. */
   ref: string;
   text: string;
   kind: FactKind;
+
+  /** Present when the fact was read from an approved source rather than authored. */
+  source?: FactProvenance;
 }
 
 /**
@@ -42,6 +65,10 @@ export interface ApprovedFact {
  *
  * - `growth-engine` — supplied by the fact authority. Nothing in this phase
  *   carries it; the renderer has no Growth Engine connection yet.
+ * - `first-party-website` — read from iThinq's own site, from the closed list
+ *   of approved pages. Authoritative because it is the company speaking about
+ *   itself in public, and every fact carries the page and wording it came
+ *   from.
  * - `document-transcription` — the statements are transcribed from an
  *   authoritative PageSpec's own authored content and bound to that
  *   document's own `provenance.factRefs`. The texts are the document's; the
@@ -49,7 +76,7 @@ export interface ApprovedFact {
  * - `reviewer-fixture` — hand-written to exercise a second vertical. Not
  *   authoritative about anything. No page built on it is real.
  */
-export type FactAuthority = 'growth-engine' | 'document-transcription' | 'reviewer-fixture';
+export type FactAuthority = 'growth-engine' | 'first-party-website' | 'document-transcription' | 'reviewer-fixture';
 
 export interface ApprovedFactSet {
   id: string;
@@ -58,6 +85,9 @@ export interface ApprovedFactSet {
   subject: string;
   authority: FactAuthority;
   facts: readonly ApprovedFact[];
+
+  /** When the set was last built from its source, for a read set. */
+  retrievedAt?: string;
 }
 
 /**

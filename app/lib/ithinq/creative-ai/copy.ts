@@ -329,7 +329,14 @@ export async function authorCampaignCopy(
     ? result.campaign.lengthTreatment
     : 'standard';
 
-  const support: SupportContext = supportContext(set.facts, documentText(spec));
+  /*
+   * A website set states what is true; it does not get to set the page's
+   * voice. See `supportContext` — ingested marketing hype would otherwise
+   * switch off the cliché guard for its own favourite words.
+   */
+  const support: SupportContext = supportContext(set.facts, documentText(spec), {
+    trustFactVoice: set.authority !== 'first-party-website',
+  });
   const findings: CopyFinding[] = [];
 
   /*

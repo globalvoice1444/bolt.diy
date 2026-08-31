@@ -44,13 +44,49 @@ export interface CopyFinding {
  * writer's to invent, because everything else is language rather than truth.
  */
 export interface SupportContext {
+  /** Everything a factual claim may rest on. */
   supported: readonly string[];
+
+  /**
+   * The voice the page is entitled to borrow, which is a smaller set.
+   *
+   * The cliché ban has always made an exception for terms the source itself
+   * uses, on the reasoning that the fact authority's own voice should not be
+   * overridden by a style rule. That reasoning holds for a Growth Engine
+   * document, which is authored. It does not hold for marketing copy read off
+   * a website: a live ingestion pulled in "streamline", "transform",
+   * "elevate", "revolutionize", "unlock", "cutting-edge" and "effortless", and
+   * every one of them would have quietly switched the guard off for the exact
+   * words it exists to keep out of a campaign.
+   *
+   * So truth and voice are separated. A website fact can support a claim. It
+   * cannot license a cliché.
+   */
+  voice: readonly string[];
   knownRefs: ReadonlySet<string>;
 }
 
-export function supportContext(facts: readonly ApprovedFact[], documentText: readonly string[]): SupportContext {
+export interface SupportOptions {
+  /**
+   * Whether these facts carry an authored voice worth deferring to.
+   *
+   * True for a Growth Engine set or a document transcription; false for
+   * anything read off a marketing site.
+   */
+  trustFactVoice?: boolean;
+}
+
+export function supportContext(
+  facts: readonly ApprovedFact[],
+  documentText: readonly string[],
+  options: SupportOptions = {},
+): SupportContext {
+  const factText = facts.map((fact) => fact.text);
+  const trustFactVoice = options.trustFactVoice ?? true;
+
   return {
-    supported: [...facts.map((fact) => fact.text), ...documentText],
+    supported: [...factText, ...documentText],
+    voice: trustFactVoice ? [...factText, ...documentText] : documentText,
     knownRefs: new Set(facts.map((fact) => fact.ref)),
   };
 }
@@ -101,8 +137,10 @@ const EVIDENCE_LEXICON = [
  * prompt banning both by name. A model told not to use a word will still reach
  * for it, so the ban is checked rather than requested.
  *
- * Allowed when the supporting material already uses the term: the fact
- * authority's own voice is never overridden by this list.
+ * Allowed when the material whose VOICE we trust already uses the term — an
+ * authored document's own register is not overridden by this list. Marketing
+ * copy read off a website supports claims but does not lend its voice, so
+ * hype on the site cannot license hype on the page.
  */
 const CLICHE_LEXICON = [
   'transform',
@@ -157,6 +195,7 @@ export function guardCopy(field: string, candidate: string, support: SupportCont
   }
 
   const haystack = normalise(support.supported.join(' \n '));
+  const voice = normalise((support.voice ?? support.supported).join(' \n '));
   const haystackNumbers = new Set(numbersIn(haystack));
 
   for (const number of numbersIn(text)) {
@@ -194,7 +233,7 @@ export function guardCopy(field: string, candidate: string, support: SupportCont
   }
 
   for (const term of CLICHE_LEXICON) {
-    if (lowered.includes(term) && !haystack.includes(term)) {
+    if (lowered.includes(term) && !voice.includes(term)) {
       findings.push({
         field,
         code: 'cliche',

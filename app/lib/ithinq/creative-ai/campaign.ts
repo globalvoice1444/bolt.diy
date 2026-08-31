@@ -4,6 +4,8 @@ import { assetIdFor, devAssetStore, type AssetStore } from './asset-store';
 import { planAssetNeeds, type AssetNeed } from './asset-need';
 import { authorCampaignCopy, type CopyResult } from './copy';
 import { factCoverage, EMPTY_FACT_SET, type ApprovedFactSet, type FactCoverage } from './facts';
+import type { FactSource } from './fact-source';
+import { selectFactSet } from './website/select';
 import { interpretBrief, type InterpretedRequest } from './interpret';
 import { buildImagePrompt } from './prompt';
 import type { CreativeRequestInput } from './request';
@@ -24,8 +26,13 @@ export interface CampaignRun {
   request: InterpretedRequest;
   strategy: CreativeStrategy;
 
-  /** The facts this campaign was allowed to assert. */
+  /** The facts this campaign was allowed to assert, after relevance selection. */
   factSet: ApprovedFactSet;
+
+  /** How the fact set was obtained, and how much of it the writer saw. */
+  factSourceId: string | null;
+  factsAvailable: number;
+  factsSelected: number;
 
   /** How well the fact set covers the document. Diagnostics, never a gate. */
   coverage: FactCoverage;
@@ -48,8 +55,21 @@ export interface CampaignOptions {
    * Without one the writer has nothing to assert from, so the page keeps the
    * document's own copy. That is the correct degradation: a campaign with no
    * fact authority behind it should not be written at all.
+   *
+   * Wins over `factSource` when both are given, so a fixture stays a fixture.
    */
   factSet?: ApprovedFactSet;
+
+  /**
+   * Where to read approved facts from when no set is supplied.
+   *
+   * The seam production points at the first-party website. Nothing downstream
+   * of this line knows or cares which source answered.
+   */
+  factSource?: FactSource;
+
+  /** How many facts the writer may be shown. Selection only engages above this. */
+  factLimit?: number;
   imageGenerator?: CreativeAssetGenerator;
   textGenerator?: StructuredTextGenerator | null;
   store?: AssetStore;
@@ -79,15 +99,34 @@ export async function runCampaign(
   const textGenerator = options.textGenerator === undefined ? resolveTextGenerator(env) : options.textGenerator;
   const imageGenerator = options.imageGenerator ?? resolveGenerator(env);
   const store = options.store ?? devAssetStore;
-  const factSet = options.factSet ?? EMPTY_FACT_SET;
+  const factSet = options.factSet ?? (await options.factSource?.load()) ?? EMPTY_FACT_SET;
   const failures: CampaignFailure[] = [];
 
   const request = await interpretBrief(input, textGenerator);
   const strategy = deriveCreativeStrategy(spec, request);
-  const coverage = factCoverage(spec, factSet);
+
+  /*
+   * Selection engages only when the corpus is bigger than the writer should
+   * see. A curated fact set is already the answer to "which facts matter
+   * here", and quietly filtering one would drop facts a reviewer deliberately
+   * put in front of the writer.
+   */
+  const factLimit = options.factLimit ?? 28;
+  const selected =
+    factSet.facts.length > factLimit
+      ? selectFactSet(factSet, {
+          instruction: request.userInstruction,
+          vertical: request.vertical ?? spec.page.vertical,
+          audience: request.audience ?? spec.page.audience,
+          objective: request.objective,
+          limit: factLimit,
+        })
+      : factSet;
+
+  const coverage = factCoverage(spec, selected);
   const copy =
-    factSet.facts.length > 0
-      ? await authorCampaignCopy(spec, factSet, request, strategy, textGenerator)
+    selected.facts.length > 0
+      ? await authorCampaignCopy(spec, selected, request, strategy, textGenerator)
       : {
           overlay: { sections: [] },
           plan: null,
@@ -155,7 +194,10 @@ export async function runCampaign(
   return {
     request,
     strategy,
-    factSet,
+    factSet: selected,
+    factSourceId: options.factSet ? null : (options.factSource?.id ?? null),
+    factsAvailable: factSet.facts.length,
+    factsSelected: selected.facts.length,
     coverage,
     copy,
     needs,

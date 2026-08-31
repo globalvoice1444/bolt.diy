@@ -18,6 +18,22 @@ export {
   EMPTY_FACT_SET,
 } from './facts';
 export { HVAC_FACTS, MED_SPA_BRIEF_FACTS, MED_SPA_CONTRACT_FACTS, DERIVED_FACT_SETS } from './fact-sets';
+export { staticFactSource, websiteFactSource } from './fact-source';
+export {
+  refreshWebsiteFacts,
+  snapshotToFactSet,
+  selectFacts,
+  selectFactSet,
+  parseHtml,
+  extractFacts,
+  fetchApprovedPage,
+  resolveWebsiteSource,
+  isApprovedFactUrl,
+  RENDERER_FACT_HOST_CEILING,
+  DEFAULT_WEBSITE_SOURCE,
+  FileSystemSnapshotStore,
+  MemorySnapshotStore,
+} from './website';
 export { guardCopy, guardFactRefs, safeCopy, supportContext } from './copy-guard';
 export { OpenAITextGenerator, OPENAI_TEXT_MODEL, resolveTextGenerator } from './provider/openai-text';
 export { assetIdFor, devAssetStore, FileSystemAssetStore } from './asset-store';
@@ -34,6 +50,26 @@ export type { CampaignRun, CampaignOptions, CampaignFailure } from './campaign';
 export type { InterpretedRequest } from './interpret';
 export type { CopyOverlay, CopyResult, SectionCopy, CampaignPlan, LengthTreatment } from './copy';
 export type { CopyFinding, SupportContext } from './copy-guard';
-export type { ApprovedFact, ApprovedFactSet, FactAuthority, FactCoverage, FactKind, SectionFacts } from './facts';
+export type {
+  ApprovedFact,
+  ApprovedFactSet,
+  FactAuthority,
+  FactCoverage,
+  FactKind,
+  FactProvenance,
+  SectionFacts,
+} from './facts';
 export type { AuditedField, ClaimAuditResult } from './claim-audit';
+export type { FactSource } from './fact-source';
+export type {
+  WebsiteSourceConfig,
+  FactSourcePage,
+  ParsedPage,
+  ContentBlock,
+  FactSnapshot,
+  SnapshotStore,
+  SelectionRequest,
+  ScoredFact,
+  FetchFailure,
+} from './website';
 export type { StructuredTextGenerator } from './provider/openai-text';
