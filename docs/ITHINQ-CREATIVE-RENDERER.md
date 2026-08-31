@@ -58,11 +58,55 @@ A kind expresses **why** a section exists, so one kind maps to several legitimat
 
 Whatever layout is chosen, **every layout renders all the content the section carries**. Layouts change arrangement, never inclusion: a section never loses its items because a direction preferred a different composition. This is covered by a test that asserts every item, question, answer, heading and body appears in the output under every direction.
 
-## Section order is preserved
+## Semantic order vs visual composition
 
-The contract states that sections are rendered in array order and must never be reordered, merged or split. The renderer honours that: presentation varies the treatment of each section, never its position. Visual grouping is done with bands and chapter rules, which change the background rhythm without moving content.
+These are two different things, and only the first is constrained.
 
-Strategy-driven reordering is therefore **not** implemented in this phase. If it is ever wanted it belongs upstream in the Growth Engine, which owns the authored order, not in the renderer.
+### What the contract requires
+
+PageSpec 1.0 requires the **semantic sequence** to be preserved, in four separate normative places:
+
+- the renderer prohibitions list — "Reorder, merge or split sections";
+- the Ordering section — "`sections` renders in array order. Do not reorder, merge or split. Order is an argument.";
+- the schema's own `sections` description — "A renderer MUST NOT reorder, merge or split: order is an argument, and the Growth Engine owns it.";
+- consumer flow step 6 — "Render the supplied content, in the supplied order."
+
+The renderer honours this. Sections are emitted in PageSpec array order, one element per source section, never merged and never split. A test asserts the rendered document's section headings appear in authored order under every direction.
+
+### What the contract does *not* constrain
+
+Preserving semantic order says nothing about how a section looks. It does **not** mean any of the following are fixed:
+
+- layouts, or which presentation primitive a section kind uses
+- section components or DOM structure
+- content widths
+- backgrounds, bands or background rhythm
+- visual hierarchy, scale or emphasis treatment
+- image placement, crop or whether imagery leads the composition
+- visual grouping, chapter breaks or transitions
+- card treatments, borders, radius or spacing language
+- responsive composition
+- presentation across creative directions
+
+All of those are the renderer's, and they vary materially between directions on the same document. Sequence is fixed; expression is not.
+
+### One wording tension, resolved conservatively
+
+The contract's "Design-intent boundary" paragraph, describing how `emphasis` may be expressed, says "*How* prominence is expressed — size, order on screen, colour, weight — is entirely yours." Read literally and in isolation, "order on screen" would permit resequencing.
+
+It sits inside a passage about expressing prominence, and it is contradicted by four explicit MUST NOTs about section order. The renderer therefore takes the restrictive reading: **sequence is preserved.** The renderer does not invent permission from an ambiguous phrase, and `emphasis` is expressed through scale, width and band instead.
+
+This is worth a clarifying edit by the contract owners; it is not a renderer defect and not something the renderer should exploit meanwhile.
+
+### If reordering is ever wanted
+
+Strategy-driven reordering is **not** implemented, and should not be added here. Order is authored strategy, so the capability belongs upstream in the Growth Engine — which would emit a different array — rather than being reconstructed downstream by a renderer that cannot see the strategy behind it.
+
+## Contract provenance
+
+`contracts/page-spec/v1/` is copied byte-for-byte from `globalvoice1444/ithinq-partner-network` at commit `51c103ff2492b068095dc356225d5d9ef496b44b`, and all four files are verified byte-identical on every test run by `contract-provenance.spec.ts`.
+
+The snapshot is an opaque vendored artifact, so `contracts/` is excluded from Prettier and ESLint. The renderer records the exact contract it consumed; it does not track the Partner Network's moving HEAD.
 
 ## Imagery
 

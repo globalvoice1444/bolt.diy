@@ -160,7 +160,7 @@ const editorialLuxe: CreativeDirection = {
       mechanism: ['editorial-split', 'numbered-flow', 'editorial-prose'],
       vertical_fit: ['feature-rail', 'editorial-prose'],
       faq: ['qa-two-column', 'accordion'],
-      risk: ['editorial-prose'],
+      risk: ['cards', 'editorial-prose'],
       default: ['editorial-prose'],
     },
     cardStyle: 'flat',
@@ -189,7 +189,7 @@ const editorialLuxe: CreativeDirection = {
 const conversionModern: CreativeDirection = {
   id: 'conversion-modern',
   label: 'Modern conversion',
-  summary: 'Crisp surfaces, elevated cards, explicit mechanism flow and a prominent banner call to action.',
+  summary: 'Crisp light surfaces, elevated white cards, structured hierarchy and a prominent banner call to action.',
   tokens: {
     paper: '#ffffff',
     surface: '#ffffff',
@@ -296,11 +296,11 @@ const serviceBold: CreativeDirection = {
     layoutPreferences: {
       interrupt: ['pull-quote', 'editorial-prose'],
       scenario: ['editorial-split', 'editorial-prose'],
-      pain: ['cards', 'pull-quote'],
+      pain: ['pull-quote', 'feature-rail'],
       mechanism: ['numbered-flow', 'editorial-split'],
-      vertical_fit: ['feature-rail', 'cards'],
+      vertical_fit: ['cards', 'feature-rail'],
       faq: ['accordion'],
-      risk: ['cards', 'editorial-prose'],
+      risk: ['feature-rail', 'editorial-prose'],
       default: ['editorial-prose'],
     },
     cardStyle: 'inverted',
