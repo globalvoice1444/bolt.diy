@@ -38,7 +38,7 @@ function renderPageSpec(input: unknown, direction?: string): Response {
       'Cache-Control': 'no-store',
       ...preview.headers,
       'Content-Security-Policy':
-        "default-src 'none'; style-src 'unsafe-inline'; img-src https: data:; frame-ancestors 'self'; base-uri 'none'; form-action 'none'",
+        "default-src 'none'; style-src 'unsafe-inline'; img-src 'self' https: data:; frame-ancestors 'self'; base-uri 'none'; form-action 'none'",
       'X-Content-Type-Options': 'nosniff',
       'Referrer-Policy': 'no-referrer',
     },

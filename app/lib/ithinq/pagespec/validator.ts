@@ -8,7 +8,25 @@ import {
   type ValidationResult,
 } from '@ithinq-pagespec/page-spec';
 
+/**
+ * Navigation trust: where a CTA or referral link may point.
+ *
+ * Deliberately separate from the media ceiling below. Authorising somewhere to
+ * *send a person* and authorising somewhere to *load pixels from* are different
+ * decisions with different blast radii, and one must never imply the other.
+ */
 export const POC_RENDERER_LINK_HOST_CEILING = ['ithinq.ai', 'partners.ithinq.ai'] as const;
+
+/**
+ * Media trust: where an image may be loaded from.
+ *
+ * Renderer-controlled and closed. A document cannot widen it, because
+ * `policy.allowedLinkHosts` is a statement about links and has no authority
+ * over media. The overlap on `ithinq.ai` is deliberate; `partners.ithinq.ai`
+ * is navigation-only and `cdn.`/`media.` are media-only, so neither trust
+ * implies the other.
+ */
+export const POC_RENDERER_MEDIA_HOST_CEILING = ['ithinq.ai', 'cdn.ithinq.ai', 'media.ithinq.ai'] as const;
 
 /**
  * Seams for the renderer-owned link-host ceiling.
@@ -31,6 +49,9 @@ export interface PageSpecValidationOptions {
    * its own CTA host.
    */
   trustedTransport?: boolean;
+
+  /** Override the renderer's media-host ceiling. Unused by the POC routes. */
+  rendererAllowedMediaHosts?: readonly string[];
 
   /**
    * Replace the built-in ceiling for a deployment fronting different hosts.
@@ -65,6 +86,32 @@ function isRecord(value: unknown): value is Record<string, unknown> {
 
 function normalizeHosts(hosts: readonly string[]): Set<string> {
   return new Set(hosts.map((host) => host.trim().toLowerCase()).filter(Boolean));
+}
+
+function validateMediaUrl(rawUrl: string, mediaHosts: Set<string>, label: string): ValidationFinding[] {
+  let parsed: URL;
+
+  try {
+    parsed = new URL(rawUrl);
+  } catch {
+    return [finding('fatal', 'missing_url', `${label} is not a valid URL.`)];
+  }
+
+  if (parsed.protocol !== 'https:') {
+    return [finding('fatal', 'insecure_url', `${label} must use HTTPS.`)];
+  }
+
+  if (!mediaHosts.has(parsed.hostname.toLowerCase())) {
+    return [
+      finding(
+        'fatal',
+        'media_host_not_allowed',
+        `${label} host ${parsed.hostname.toLowerCase()} is outside the renderer media ceiling.`,
+      ),
+    ];
+  }
+
+  return [];
 }
 
 function validateUrl(
@@ -124,6 +171,7 @@ export function validatePageSpec(value: unknown, options: PageSpecValidationOpti
   const skipSections: number[] = [];
   const documentHosts = normalizeHosts(spec.policy.allowedLinkHosts);
   const rendererHosts = normalizeHosts(options.rendererAllowedLinkHosts ?? POC_RENDERER_LINK_HOST_CEILING);
+  const mediaHosts = normalizeHosts(options.rendererAllowedMediaHosts ?? POC_RENDERER_MEDIA_HOST_CEILING);
   const effectiveHosts = options.trustedTransport
     ? documentHosts
     : new Set([...documentHosts].filter((host) => rendererHosts.has(host)));
@@ -160,7 +208,7 @@ export function validatePageSpec(value: unknown, options: PageSpecValidationOpti
     }
 
     if (section.asset) {
-      findings.push(...validateUrl(section.asset.url, documentHosts, effectiveHosts, `Section ${index} asset`));
+      findings.push(...validateMediaUrl(section.asset.url, mediaHosts, `Section ${index} asset`));
     }
   });
 

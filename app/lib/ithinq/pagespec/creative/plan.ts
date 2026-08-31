@@ -11,6 +11,15 @@ import type {
 
 export interface PlanOptions {
   /**
+   * AssetNeed ids that have generated imagery available.
+   *
+   * Renderer-local creative material. It influences composition — hero
+   * treatment, media placement, image emphasis — without entering the
+   * PageSpec or becoming a source of business truth.
+   */
+  generatedAssetNeedIds?: readonly string[];
+
+  /**
    * Creative direction requested by the caller.
    *
    * This is the seam a future creative orchestrator writes to. It is a
@@ -154,8 +163,27 @@ function findHeroAssetIndex(spec: PageSpec, skip: ReadonlySet<number>): number |
   return null;
 }
 
+function needsMedia(variant: HeroVariant): boolean {
+  return variant === 'split-media' || variant === 'full-bleed-media';
+}
+
+/**
+ * Choose the hero treatment.
+ *
+ * When a hero image actually exists, prefer the direction's media-capable
+ * variant even if it is not first in the list. A direction orders its
+ * preferences for the common image-less case; once imagery has been generated
+ * for the hero, ignoring it would leave the strategy's own asset unused and
+ * quietly turn an image-forward brief into a typographic page.
+ */
 function resolveHeroVariant(variants: readonly HeroVariant[], hasMedia: boolean): HeroVariant {
-  const needsMedia = (variant: HeroVariant) => variant === 'split-media' || variant === 'full-bleed-media';
+  if (hasMedia) {
+    const mediaVariant = variants.find(needsMedia);
+
+    if (mediaVariant) {
+      return mediaVariant;
+    }
+  }
 
   for (const variant of variants) {
     if (!needsMedia(variant) || hasMedia) {
@@ -188,10 +216,12 @@ export function planPresentation(
   const policy = direction.composition;
   const skip = new Set(skipSections);
 
+  const generated = new Set(options.generatedAssetNeedIds ?? []);
   const heroAssetIndex = findHeroAssetIndex(spec, skip);
-  const heroVariant = resolveHeroVariant(policy.heroVariants, heroAssetIndex !== null);
-  const heroUsesMedia =
-    heroAssetIndex !== null && (heroVariant === 'split-media' || heroVariant === 'full-bleed-media');
+  const heroHasGenerated = generated.has('hero');
+  const heroVariant = resolveHeroVariant(policy.heroVariants, heroAssetIndex !== null || heroHasGenerated);
+  const heroWantsMedia = heroVariant === 'split-media' || heroVariant === 'full-bleed-media';
+  const heroUsesMedia = heroWantsMedia && (heroAssetIndex !== null || heroHasGenerated);
 
   const sections: SectionPresentation[] = [];
   let rendered = 0;
@@ -228,7 +258,18 @@ export function planPresentation(
      * Only a media split may mirror. Flipping a copy-only split would place the
      * body visually before its own heading, which breaks reading order.
      */
-    const mirrored = policy.alternate && layout === 'editorial-split' && ownsAsset && splitOccurrence % 2 === 1;
+    const generatedNeedId = generated.has(`section-${sourceIndex}`) ? `section-${sourceIndex}` : null;
+
+    if (generatedNeedId && media === 'none') {
+      sawSectionMedia = true;
+      media = layout === 'editorial-split' ? (splitOccurrence % 2 === 0 ? 'trailing' : 'leading') : 'inset';
+    }
+
+    const mirrored =
+      policy.alternate &&
+      layout === 'editorial-split' &&
+      (ownsAsset || Boolean(generatedNeedId)) &&
+      splitOccurrence % 2 === 1;
 
     if (layout === 'editorial-split') {
       splitOccurrence += 1;
@@ -249,6 +290,7 @@ export function planPresentation(
       mirrored,
       chapterStart,
       promoted,
+      generatedAssetNeedId: generatedNeedId,
     });
 
     rendered += 1;
@@ -258,7 +300,8 @@ export function planPresentation(
     variant: heroVariant,
     media: heroUsesMedia ? (heroVariant === 'full-bleed-media' ? 'full-bleed' : 'trailing') : 'none',
     band: heroVariant === 'offset-panel' ? 'inverted' : 'base',
-    mediaSourceIndex: heroUsesMedia ? heroAssetIndex : null,
+    mediaSourceIndex: heroUsesMedia && heroAssetIndex !== null ? heroAssetIndex : null,
+    generatedAssetNeedId: heroUsesMedia && heroAssetIndex === null && heroHasGenerated ? 'hero' : null,
   };
 
   const closing: ClosingPresentation = {

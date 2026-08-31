@@ -288,7 +288,7 @@ const serviceBold: CreativeDirection = {
     rhythm: '0.85',
   },
   composition: {
-    heroVariants: ['offset-panel', 'centered-statement'],
+    heroVariants: ['offset-panel', 'centered-statement', 'full-bleed-media'],
     contentWidth: 'wide',
     bandCycle: ['inverted', 'base', 'accent', 'base'],
     chapterEvery: null,
@@ -380,9 +380,9 @@ const clinicalCalm: CreativeDirection = {
     promoteLeadSections: true,
   },
   signatureCss: `
-[data-direction='clinical-calm'] .hero{text-align:center}
-[data-direction='clinical-calm'] .hero .actions{justify-content:center}
-[data-direction='clinical-calm'] .hero .measure{margin-inline:auto}
+[data-direction='clinical-calm'] .hero[data-hero='centered-statement']{text-align:center}
+[data-direction='clinical-calm'] .hero[data-hero='centered-statement'] .actions{justify-content:center}
+[data-direction='clinical-calm'] .hero[data-hero='centered-statement'] .measure{margin-inline:auto}
 [data-direction='clinical-calm'] .card{border-radius:var(--radius-large)}
 [data-direction='clinical-calm'] .eyebrow{color:var(--accent-text)}
 [data-direction='clinical-calm'] .rail__item{border-radius:var(--radius-large);background:var(--surface);border-top:0;padding:18px 22px}

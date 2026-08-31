@@ -1,4 +1,5 @@
 export { composeDocument, escapeHtml } from './compose';
+export type { GeneratedMedia } from './compose';
 export { getDirection, listDirections } from './directions';
 export { isDirectionId, isLayoutFeasible, planPresentation, selectDirection } from './plan';
 export { buildStylesheet } from './stylesheet';
