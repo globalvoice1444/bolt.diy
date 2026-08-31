@@ -165,9 +165,33 @@ describe('OpenAI provider', () => {
   });
 
   it('selects OpenAI only when a real key is present', () => {
-    expect(resolveGenerator({ OPENAI_API_KEY: 'sk-real-value' })).toBeInstanceOf(OpenAIImageGenerator);
-    expect(resolveGenerator({ OPENAI_API_KEY: 'your_openai_api_key_here' })).toBeInstanceOf(PlaceholderImageGenerator);
-    expect(resolveGenerator({})).toBeInstanceOf(PlaceholderImageGenerator);
+    /*
+     * `resolveGenerator` deliberately falls back to the ambient process
+     * environment, so this must be hermetic: without stubbing, the assertion
+     * would pass or fail depending on whether the developer's machine happens
+     * to have a key configured.
+     */
+    vi.stubEnv('OPENAI_API_KEY', '');
+
+    try {
+      expect(resolveGenerator({ OPENAI_API_KEY: 'sk-real-value' })).toBeInstanceOf(OpenAIImageGenerator);
+      expect(resolveGenerator({ OPENAI_API_KEY: 'your_openai_api_key_here' })).toBeInstanceOf(
+        PlaceholderImageGenerator,
+      );
+      expect(resolveGenerator({})).toBeInstanceOf(PlaceholderImageGenerator);
+    } finally {
+      vi.unstubAllEnvs();
+    }
+  });
+
+  it('falls back to the ambient server environment when no env is passed', () => {
+    vi.stubEnv('OPENAI_API_KEY', 'sk-ambient-value');
+
+    try {
+      expect(resolveGenerator()).toBeInstanceOf(OpenAIImageGenerator);
+    } finally {
+      vi.unstubAllEnvs();
+    }
   });
 });
 

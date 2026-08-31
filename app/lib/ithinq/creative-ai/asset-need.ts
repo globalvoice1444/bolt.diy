@@ -1,4 +1,5 @@
 import type { PageSpec } from '@ithinq-pagespec/page-spec';
+import { getDirection } from '~/lib/ithinq/pagespec/creative';
 import type { CreativeStrategy } from './strategy';
 
 /**
@@ -45,40 +46,90 @@ const MOOD_STYLE: Readonly<Record<CreativeStrategy['visualMood'], string>> = {
   utilitarian: 'straightforward documentary photography, honest lighting, practical working environment',
 };
 
-/** Human-readable scene direction per vertical. Creative framing, never a claim. */
-const VERTICAL_SCENE: ReadonlyArray<[readonly string[], string]> = [
+/**
+ * Scene direction per vertical. Creative framing, never a claim.
+ *
+ * Each vertical carries several distinct moments rather than one. A page that
+ * asks for a hero and two supporting visuals should not receive three images
+ * of the same room: repeating one scene reads as stock filler, so the planner
+ * hands each role a different moment within the same world.
+ */
+interface VerticalScenes {
+  hero: string;
+  supporting: readonly string[];
+}
+
+const VERTICAL_SCENE: ReadonlyArray<[readonly string[], VerticalScenes]> = [
   [
     ['med-spa', 'medspa', 'med spa', 'aesthetic', 'derm'],
-    'a modern medical aesthetics practice: calm consultation room, considered architectural interior, a practitioner and client in unhurried conversation',
+    {
+      hero: 'a modern medical aesthetics practice: calm consultation room, considered architectural interior, a practitioner and client in unhurried conversation',
+      supporting: [
+        'the reception area of a modern medical aesthetics practice: soft daylight across a clean stone desk, a phone handset resting beside a slim monitor, nobody at the desk',
+        'a practitioner in a modern aesthetics clinic pausing between appointments in a quiet corridor, treatment-room doorway softly out of focus behind her',
+      ],
+    },
   ],
   [
     ['dental', 'clinic', 'medical', 'health'],
-    'a contemporary healthcare practice: bright uncluttered treatment space, reassuring practitioner-and-patient interaction',
+    {
+      hero: 'a contemporary healthcare practice: bright uncluttered treatment space, reassuring practitioner-and-patient interaction',
+      supporting: [
+        'the front desk of a contemporary healthcare practice in soft daylight, unattended for a moment',
+        'a clinician walking a bright, calm corridor between consultation rooms',
+      ],
+    },
   ],
   [
     ['hvac', 'plumbing', 'roofing', 'home-service', 'contractor', 'electric'],
-    'a professional home-services business: a uniformed technician taking a call in a clean service vehicle or tidy workshop',
+    {
+      hero: 'a professional home-services business: a uniformed technician taking a call in a clean service vehicle or tidy workshop',
+      supporting: [
+        'a tidy home-services dispatch desk with a phone and job board, warm practical lighting',
+        'a uniformed technician arriving at a suburban front door with a toolbag, late afternoon light',
+      ],
+    },
   ],
   [
     ['legal', 'law'],
-    'a professional legal practice: composed consultation across a desk in a quiet, well-appointed office',
+    {
+      hero: 'a professional legal practice: composed consultation across a desk in a quiet, well-appointed office',
+      supporting: [
+        'the reception of a well-appointed legal practice, quiet and unattended, soft window light',
+        'a lawyer reviewing papers at a broad desk in a calm office, shallow depth of field',
+      ],
+    },
   ],
   [
     ['hospitality', 'hotel', 'resort'],
-    'a refined hospitality setting: a welcoming front desk in warm architectural light',
+    {
+      hero: 'a refined hospitality setting: a welcoming front desk in warm architectural light',
+      supporting: [
+        'a quiet hotel lobby seating area in warm evening light',
+        'a concierge desk with a telephone and a small arrangement of flowers, nobody attending',
+      ],
+    },
   ],
 ];
 
-function sceneFor(vertical: string | null): string {
+const DEFAULT_SCENES: VerticalScenes = {
+  hero: 'a professional service business: a considered, human working environment with a calm customer interaction',
+  supporting: [
+    'the reception desk of a professional service business, unattended for a moment in soft daylight',
+    'a professional stepping away from a busy workspace to take a call',
+  ],
+};
+
+function scenesFor(vertical: string | null): VerticalScenes {
   const key = (vertical ?? '').toLowerCase();
 
-  for (const [cues, scene] of VERTICAL_SCENE) {
+  for (const [cues, scenes] of VERTICAL_SCENE) {
     if (cues.some((cue) => key.includes(cue))) {
-      return scene;
+      return scenes;
     }
   }
 
-  return 'a professional service business: a considered, human working environment with a calm customer interaction';
+  return DEFAULT_SCENES;
 }
 
 /**
@@ -93,20 +144,34 @@ export function planAssetNeeds(spec: PageSpec, strategy: CreativeStrategy): Asse
     return [];
   }
 
-  const scene = sceneFor(spec.page.vertical);
+  const scenes = scenesFor(spec.page.vertical);
   const style = MOOD_STYLE[strategy.visualMood];
   const needs: AssetNeed[] = [];
+  const objective = strategy.objective.replace(/\.\s*$/, '');
+
+  /*
+   * Ask for the shape the hero will actually be rendered at.
+   *
+   * The direction decides its hero treatment, so requesting a wide full-bleed
+   * frame for a direction that composes a split hero produces an image whose
+   * carefully placed negative space is then cropped away. The need follows the
+   * placement rather than guessing at it.
+   */
+  const heroVariant = getDirection(strategy.directionId).composition.heroVariants.find(
+    (variant) => variant === 'split-media' || variant === 'full-bleed-media',
+  );
+  const heroIsFullBleed = heroVariant === 'full-bleed-media';
 
   needs.push({
     id: 'hero',
     role: 'hero',
-    subject: scene,
-    context: `Opening image for a landing page whose objective is: ${strategy.objective}`,
+    subject: scenes.hero,
+    context: `Opening image for a landing page whose objective is: ${objective}`,
     visualStyle: style,
-    aspectRatio: strategy.imageStrategy === 'led' ? '16:9' : '4:5',
-    placementIntent: strategy.imageStrategy === 'led' ? 'full-bleed' : 'split-hero',
+    aspectRatio: heroIsFullBleed ? '16:9' : '4:5',
+    placementIntent: heroIsFullBleed ? 'full-bleed' : 'split-hero',
     sectionAssociation: null,
-    altIntent: `Illustrative photograph of ${scene}`,
+    altIntent: `Illustrative photograph of ${scenes.hero}`,
     required: false,
   });
 
@@ -121,17 +186,19 @@ export function planAssetNeeds(spec: PageSpec, strategy: CreativeStrategy): Asse
    */
   const supporting = strategy.emphasisSectionIndices.slice(0, strategy.imageStrategy === 'led' ? 2 : 1);
 
-  for (const index of supporting) {
+  supporting.forEach((index, position) => {
     const section = spec.sections[index];
 
     if (!section) {
-      continue;
+      return;
     }
+
+    const subject = scenes.supporting[position % scenes.supporting.length] ?? scenes.hero;
 
     needs.push({
       id: `section-${index}`,
-      role: index === supporting[0] ? 'supporting' : 'editorial-break',
-      subject: scene,
+      role: position === 0 ? 'supporting' : 'editorial-break',
+      subject,
       context: `Supporting visual for the "${section.kind}" section, which serves the purpose "${section.purpose}"`,
       visualStyle: style,
       aspectRatio: '3:2',
@@ -140,7 +207,7 @@ export function planAssetNeeds(spec: PageSpec, strategy: CreativeStrategy): Asse
       altIntent: `Illustrative photograph supporting the ${section.kind} section`,
       required: false,
     });
-  }
+  });
 
   return needs;
 }

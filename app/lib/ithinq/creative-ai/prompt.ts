@@ -18,6 +18,22 @@ const COMPOSITION: Readonly<Record<AssetNeed['placementIntent'], string>> = {
   'editorial-break': 'composed as a wide editorial break between sections, horizontal emphasis, unhurried framing',
 };
 
+/**
+ * Positive framing of the same constraint.
+ *
+ * Image models follow a described scene far more reliably than a list of
+ * negations — a live run produced wall signage reading "MEDICAL AESTHETICS"
+ * despite an explicit "no lettering" exclusion. Describing the surfaces as
+ * deliberately blank is what actually keeps text out of the frame, and the
+ * negative list below stays as a second line of defence.
+ *
+ * This matters beyond tidiness: generated lettering is generated *text* on a
+ * marketing page, and the same failure that renders a wall sign could render a
+ * brand name, an award or a statistic.
+ */
+const UNBRANDED_DIRECTION =
+  'All surfaces are deliberately blank and unbranded: plain walls with no signage, no wall lettering, no printed words, no posters and no visible screen content.';
+
 const NEGATIVE_DIRECTION = [
   'no text',
   'no lettering',
@@ -51,6 +67,7 @@ export function buildImagePrompt(need: AssetNeed, strategy: CreativeStrategy): s
     `Composition: ${COMPOSITION[need.placementIntent]}.`,
     `Aspect ratio ${need.aspectRatio}.`,
     'Realistic modern commercial photography, authentic and specific rather than generic stock imagery.',
+    UNBRANDED_DIRECTION,
     `Do not include: ${NEGATIVE_DIRECTION}.`,
   ].join(' ');
 }
