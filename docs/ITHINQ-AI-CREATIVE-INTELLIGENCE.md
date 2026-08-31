@@ -71,9 +71,38 @@ To show a genuine vertical contrast, `demo-specs.ts` carries a second document �
 
 Engineering and product review only. No Partner authentication, no production UI.
 
+## Where copy authorship is going
+
+Phase 3 generates *expression* around supplied truth. That is the right scope for this phase, and it is **not** the intended end state.
+
+The accepted product direction is:
+
+```text
+Partner request
+  -> authoritative iThinq facts
+  -> AI campaign reasoning
+  -> original persuasive campaign copy
+  -> image generation
+  -> creative presentation
+  -> finished page
+```
+
+The difference is the third and fourth steps. Today the model may only restate what the PageSpec already says. In the target model it reasons over an authoritative fact set and writes original campaign copy from it — still grounded, but no longer limited to rephrasing sentences the Growth Engine happened to write.
+
+Phase 3 deliberately leaves that seam clean rather than closing it:
+
+- `CopyOverlay` is already the renderer's only copy channel, so richer authorship changes what fills it, not how it reaches the page.
+- `copy-guard.ts` is already the single enforcement point. Fact-set grounding replaces "must appear in the source string" with "must be supported by an approved fact", without moving where the check happens.
+- `provenance.factRefs` already exists on every section in the contract, so the fact set has somewhere to come from and each claim has somewhere to point.
+- The disclosure, CTAs and Partner identity are structurally unreachable regardless of how copy is produced.
+
+What that step needs, and what this phase does not attempt, is the approved fact set plumbed through from the Growth Engine and a per-claim traceability check. **No PageSpec change is required for it.**
+
 ## Current limitations
 
-- Copy is rephrasing, not authoring. The system cannot say anything the PageSpec does not already say, by design. Genuinely new claims need fact-reference plumbing and Growth Engine authorship.
+- Copy is rephrasing rather than original authorship for now; see the section above for where that goes and why the seam is already in place.
+- **Interpretation is non-deterministic.** The brief is read by a model at temperature 0.4, so the same brief can select a different — still appropriate — direction between runs; a premium med-spa brief has resolved to both `editorial-luxe` and `clinical-calm`. Everything downstream of interpretation is fully deterministic: given a fixed interpretation, five runs produce one identical plan. Pin `creativeDirection` explicitly when a specific direction is required.
+- **Generated lettering is reduced, not eliminated.** Prompts state positively that surfaces are blank and unbranded and also list the exclusions, but the image model still occasionally renders incidental signage — a live run produced a job board reading "HOME SERVICES". It has not produced a brand name, statistic or award, and the truth guards do not cover pixels. Treat generated imagery as reviewable creative, not as unattended output.
 - Two model calls per campaign (interpretation, copy), sequential with image generation. No batching, retry or streaming.
 - The cliché list is a fixed lexicon; it will need tending as voices change.
 - Section count and order still come from the PageSpec. The system chooses how sections are expressed, not how many exist — that is authored strategy and the contract forbids reordering.
