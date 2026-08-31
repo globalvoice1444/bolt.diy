@@ -139,12 +139,27 @@ function scenesFor(vertical: string | null): VerticalScenes {
  * is often no image, and a system that always generates one is decoration
  * rather than design.
  */
-export function planAssetNeeds(spec: PageSpec, strategy: CreativeStrategy): AssetNeed[] {
+export function planAssetNeeds(
+  spec: PageSpec,
+  strategy: CreativeStrategy,
+
+  /**
+   * The market the campaign is actually for, when the request names one.
+   *
+   * Scene choice is presentation, not truth — a photograph asserts nothing —
+   * so the request may steer it, exactly as it already steers tone, direction
+   * and density. It has to: once facts are selected from the website by
+   * request rather than read from the document, a law-firm campaign built on a
+   * med-spa document was getting law-firm copy over med-spa consultation-room
+   * photography. Falls back to the document's own market.
+   */
+  vertical?: string | null,
+): AssetNeed[] {
   if (strategy.imageStrategy === 'none') {
     return [];
   }
 
-  const scenes = scenesFor(spec.page.vertical);
+  const scenes = scenesFor(vertical || spec.page.vertical);
   const style = MOOD_STYLE[strategy.visualMood];
   const needs: AssetNeed[] = [];
   const objective = strategy.objective.replace(/\.\s*$/, '');

@@ -146,7 +146,7 @@ export async function runCampaign(
     });
   }
 
-  const needs = planAssetNeeds(spec, strategy);
+  const needs = planAssetNeeds(spec, strategy, request.vertical);
   const assets: GeneratedAsset[] = [];
 
   if (!options.skipImages) {

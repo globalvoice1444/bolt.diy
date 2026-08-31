@@ -127,6 +127,30 @@ const EVIDENCE_LEXICON = [
   'guaranteed results',
   'no.1',
   'no. 1',
+
+  /*
+   * Regulatory and security claims, which are evidence of the most dangerous
+   * kind: a live law-firm run produced "all data is encrypted during transit
+   * and at rest, compliant with GDPR and privacy laws" from a fact set that
+   * says nothing about either. The semantic audit caught the neighbouring
+   * invented CRM integration and let this one through, which is exactly why
+   * the deterministic lexicon exists — a regime nobody has certified is not a
+   * claim a model gets to make on a Partner's behalf.
+   */
+  'gdpr',
+  'hipaa',
+  'ccpa',
+  'soc 2',
+  'soc2',
+  'iso 27001',
+  'pci',
+  'compliant',
+  'compliance',
+  'encrypted',
+  'encryption',
+  'bank-level',
+  'bank grade',
+  'military-grade',
 ];
 
 /**
@@ -162,6 +186,21 @@ const CLICHE_LEXICON = [
   'cutting-edge',
   'harness the',
   'take your',
+
+  /*
+   * The formula two live campaigns collapsed onto.
+   *
+   * "Never miss a call" is the source website's dominant framing, so both a
+   * med-spa and a law-firm campaign reached for it as their headline and the
+   * two pages became the same promise with different photography. It is also
+   * the definition of filler by this brief's own rule: it would work for any
+   * company in any industry. A campaign has to say what only this reader would
+   * recognise, and the fact behind it can still be expressed a hundred better
+   * ways.
+   */
+  'never miss',
+  'never misses',
+  'miss another call',
 ];
 
 function normalise(value: string): string {
