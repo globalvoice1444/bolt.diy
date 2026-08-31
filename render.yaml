@@ -13,7 +13,13 @@ services:
     plan: starter
     region: oregon
     branch: main
-    buildCommand: corepack enable && pnpm install --frozen-lockfile && NODE_OPTIONS=--max-old-space-size=8192 pnpm run build
+    # `--prod=false` is load-bearing. Render applies the service env vars to the
+    # BUILD as well as the runtime, so NODE_ENV=production below makes pnpm skip
+    # devDependencies -- and vite, @remix-run/dev (which runs the build) and
+    # @remix-run/serve (which runs the start command) all live there. Without it
+    # the install dies on the husky `prepare` script and the build could not have
+    # run anyway.
+    buildCommand: corepack enable && pnpm install --frozen-lockfile --prod=false && NODE_OPTIONS=--max-old-space-size=8192 pnpm run build
     startCommand: pnpm run start
     healthCheckPath: /api/health
     autoDeploy: false
@@ -22,6 +28,10 @@ services:
         value: '22'
       - key: NODE_ENV
         value: production
+      # Git hooks have no purpose on a build machine, and a failing hook installer
+      # should never be able to fail a deploy. husky respects HUSKY=0.
+      - key: HUSKY
+        value: '0'
       # Required for campaign authorship. Server-side only; never reaches the
       # browser bundle. Without it the engine degrades to the document's own
       # copy and placeholder imagery rather than failing.
