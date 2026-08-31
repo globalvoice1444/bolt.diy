@@ -1,4 +1,5 @@
 import type { Cta, PageSpec, PageSpecSection } from '@ithinq-pagespec/page-spec';
+import { effectiveSection, sectionCopyAt, type CopyText } from './copy-text';
 import type { CreativeDirection } from './directions';
 import { buildStylesheet } from './stylesheet';
 import type { CreativePresentationPlan, SectionPresentation } from './types';
@@ -43,6 +44,8 @@ function renderActions(spec: PageSpec): string {
   return `<div class="actions">${primary}${secondary}</div>`;
 }
 
+export type { CopyText, SectionCopyText } from './copy-text';
+
 /**
  * Renderer-local generated imagery, resolved by AssetNeed id.
  *
@@ -50,20 +53,6 @@ function renderActions(spec: PageSpec): string {
  * generated creative never enters the PageSpec, and its media origin is
  * governed by media trust rather than by navigation trust.
  */
-/**
- * Renderer-local presentation copy.
- *
- * Structurally unable to address the disclosure, the CTAs or Partner
- * identity: those fields simply do not exist here, so no overlay can reach
- * them. Absent fields fall back to the PageSpec, which remains untouched.
- */
-export interface CopyText {
-  headline?: string;
-  subheadline?: string;
-  audience?: string;
-  sections: ReadonlyArray<{ index: number; eyebrow?: string; heading?: string; body?: string }>;
-}
-
 export interface GeneratedMedia {
   assetNeedId: string;
   url: string;
@@ -77,20 +66,14 @@ function renderAssetImage(asset: { url: string; alt: string }, className: string
   return `<figure class="${className}"><img ${attr('src', asset.url)} ${attr('alt', asset.alt)}${loading}></figure>`;
 }
 
-function renderHead(
-  section: PageSpecSection,
-  presentation: SectionPresentation,
-  showIndex: boolean,
-  copy?: { eyebrow?: string; heading?: string },
-): string {
+function renderHead(section: PageSpecSection, presentation: SectionPresentation, showIndex: boolean): string {
   const parts: string[] = [];
 
   if (showIndex) {
     parts.push(`<span class="index-mark" aria-hidden="true">${ordinal(presentation.sourceIndex)}</span>`);
   }
 
-  const eyebrow = copy?.eyebrow ?? section.eyebrow;
-  const heading = copy?.heading ?? section.heading;
+  const { eyebrow, heading } = section;
 
   if (eyebrow) {
     parts.push(`<p class="eyebrow">${escapeHtml(eyebrow)}</p>`);
@@ -103,8 +86,8 @@ function renderHead(
   return parts.length > 0 ? `<div class="section__head">${parts.join('')}</div>` : '';
 }
 
-function renderBody(section: PageSpecSection, presentation: SectionPresentation, override?: string): string {
-  const body = override ?? section.body;
+function renderBody(section: PageSpecSection, presentation: SectionPresentation): string {
+  const { body } = section;
 
   if (!body) {
     return '';
@@ -224,15 +207,21 @@ function renderSection(
     return '';
   }
 
-  const sectionCopy = copy?.sections.find((item) => item.index === presentation.sourceIndex);
+  const sectionCopy = sectionCopyAt(copy, presentation.sourceIndex);
 
+  /*
+   * Authored copy may add items or Q&A to a beat the document left as prose,
+   * so everything below reads the merged view rather than the raw section.
+   * The planner built this presentation from the same view.
+   */
+  const rendered = effectiveSection(section, sectionCopy);
   const generated = presentation.generatedAssetNeedId ? media.get(presentation.generatedAssetNeedId) : undefined;
 
   let splitFlavour = 'none';
-  const head = renderHead(section, presentation, showIndex, sectionCopy);
-  const body = renderBody(section, presentation, sectionCopy?.body);
-  const items = renderItems(section, presentation);
-  const qa = renderQa(section, presentation);
+  const head = renderHead(rendered, presentation, showIndex);
+  const body = renderBody(rendered, presentation);
+  const items = renderItems(rendered, presentation);
+  const qa = renderQa(rendered, presentation);
   const image = section.asset ?? generated;
   const hasAsset = Boolean(image) && presentation.media !== 'none';
 

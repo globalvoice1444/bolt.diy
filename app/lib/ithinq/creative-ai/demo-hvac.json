@@ -3,7 +3,7 @@
   "page": {
     "reference": "spec:hvac:missed-calls-demo",
     "origin": "generated",
-    "name": "HVAC \u2014 Calls that go to voicemail",
+    "name": "HVAC — Calls that go to voicemail",
     "audience": "Owner or dispatcher running a small HVAC company",
     "headline": "The furnace call came in at 4:50pm and rang out",
     "subheadline": "An AI Voice Assistant that answers when the crew is on a job, takes the details a quote needs, and keeps the callback moving.",
@@ -67,7 +67,14 @@
       "purpose": "explain_mechanism",
       "emphasis": "lead",
       "provenance": {
-        "factRefs": ["f_75d60d5805ea05c7145b400281cc957242de5fa8e63cf727bf73aa830424a397"]
+        "factRefs": [
+          "f_f9e49f59d6d44c32efa016112cd90781307c78e780a45b250cfcb6114b90419e",
+          "f_7d57a21b02d28d22947aa78299e444430ef45f8f8eaa054d989d3eee954ed3b2",
+          "f_c418c44a06d152c76b0e11fee2323934b4a8b9b0a0c48307f5d4af126367bd70",
+          "f_9ae491a7cb5daecf926ee2e109ba4e8764d98e3568d9538eb36567b77680980b",
+          "f_b855a04e45223624fbeeb0172ffeabd67727e9d8a032fa95acfbdc68b76b54bf",
+          "f_7333a6a92b2eeee445fec9f90ddd75f32c45c6595af700ea26d749c5d617c545"
+        ]
       },
       "eyebrow": "How it works",
       "heading": "How it works",
@@ -78,7 +85,13 @@
       "purpose": "establish_fit",
       "emphasis": "support",
       "provenance": {
-        "factRefs": ["f_e576f6b02ad7e84384e8847a88a76239fb3132f2080ddc7552a120868dec7097"]
+        "factRefs": [
+          "f_f9e49f59d6d44c32efa016112cd90781307c78e780a45b250cfcb6114b90419e",
+          "f_7d57a21b02d28d22947aa78299e444430ef45f8f8eaa054d989d3eee954ed3b2",
+          "f_c418c44a06d152c76b0e11fee2323934b4a8b9b0a0c48307f5d4af126367bd70",
+          "f_d02a56c03b60858647a90be917afe59c6c04b385a23b1438c1dc494f86687fce",
+          "f_b2b6423b56222fe55e697cc435a92e8d1c2d377e451d2aa46e351ba8d848fe5e"
+        ]
       },
       "eyebrow": "Fit",
       "heading": "This suits you if",
@@ -94,7 +107,10 @@
       "purpose": "reduce_risk",
       "emphasis": "support",
       "provenance": {
-        "factRefs": ["f_f6db12335f0bf1815420121694e44b746f06900a93cc9cfaf22b612fa056a6b1"]
+        "factRefs": [
+          "f_f8130ae8a24beda0806260346bc2359df08bb53519f78c40bfb426ce938b8944",
+          "f_9bead8ef00effdaed8d6f24b9225d9683cf8c5df7507ce34a033605e623e547a"
+        ]
       },
       "eyebrow": "Fit",
       "heading": "This is not for you if",
@@ -108,7 +124,11 @@
       "purpose": "handle_objection",
       "emphasis": "support",
       "provenance": {
-        "factRefs": ["f_48fb2b5e18e254181112f15a27c2af6505ca58fdf6f67b49a0fc695866695895"]
+        "factRefs": [
+          "f_9bead8ef00effdaed8d6f24b9225d9683cf8c5df7507ce34a033605e623e547a",
+          "f_7333a6a92b2eeee445fec9f90ddd75f32c45c6595af700ea26d749c5d617c545",
+          "f_885b91cf3bd55e73d4f9a0fba8de76e569a14dc2cc1f088684d23436520eaef6"
+        ]
       },
       "eyebrow": "Questions",
       "heading": "Common questions",
