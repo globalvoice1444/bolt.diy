@@ -1,0 +1,44 @@
+# Render Blueprint for the Bolt creative engine.
+#
+# One Web Service. The same process serves the frontend, the Remix loaders and
+# the generated-image route; splitting them would only put a network hop
+# between a campaign page and its own imagery.
+#
+# Secrets are NOT in this file. `sync: false` means Render prompts for the
+# value once and stores it in the service environment.
+services:
+  - type: web
+    name: ithinq-bolt-renderer
+    runtime: node
+    plan: starter
+    region: oregon
+    branch: main
+    buildCommand: corepack enable && pnpm install --frozen-lockfile && NODE_OPTIONS=--max-old-space-size=8192 pnpm run build
+    startCommand: pnpm run start
+    healthCheckPath: /api/health
+    autoDeploy: false
+    envVars:
+      - key: NODE_VERSION
+        value: '22'
+      - key: NODE_ENV
+        value: production
+      # Required for campaign authorship. Server-side only; never reaches the
+      # browser bundle. Without it the engine degrades to the document's own
+      # copy and placeholder imagery rather than failing.
+      - key: OPENAI_API_KEY
+        sync: false
+      # Optional. Defaults to https://ithinq.ai. Cannot widen the fact host
+      # ceiling, which is closed in code.
+      # - key: ITHINQ_WEBSITE_ORIGIN
+      #   sync: false
+      # Optional. Overrides the approved page list for fact ingestion.
+      # - key: ITHINQ_WEBSITE_PATHS
+      #   sync: false
+#
+# No persistent disk is declared. Generated imagery and the website fact
+# snapshot live under `.data/` on the instance filesystem and do not survive a
+# redeploy: imagery regenerates on the next request and the snapshot is rebuilt
+# with `pnpm ithinq:refresh-facts`. That is acceptable for smoke testing and
+# is NOT acceptable once Partner-facing campaign pages must keep the same
+# imagery across deploys — add a disk mounted at /opt/render/project/src/.data,
+# or an object store behind the existing AssetStore interface, before then.

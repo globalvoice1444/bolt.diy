@@ -1,9 +1,10 @@
-import { json, type LoaderFunctionArgs, type MetaFunction } from '@remix-run/cloudflare';
+import { json, type LoaderFunctionArgs, type MetaFunction } from '@remix-run/node';
 import { useLoaderData } from '@remix-run/react';
 import examplePageSpec from '@ithinq-pagespec/page-spec.example.json';
 import type { PageSpec } from '@ithinq-pagespec/page-spec';
 import { buildImagePrompt, orchestrateCreative } from '~/lib/ithinq/creative-ai';
 import { MED_SPA_DEMO_INSTRUCTION, readCreativeRequest } from '~/lib/ithinq/creative-ai/route-input';
+import { getRuntimeEnv } from '~/lib/ithinq/runtime-env';
 
 export const meta: MetaFunction = () => [
   { title: 'iThinq creative lab' },
@@ -26,7 +27,7 @@ const PRESETS = [
 export async function loader({ request, context }: LoaderFunctionArgs) {
   const input = readCreativeRequest(request);
   const spec = examplePageSpec as unknown as PageSpec;
-  const env = (context?.cloudflare?.env ?? {}) as unknown as Record<string, string | undefined>;
+  const env = getRuntimeEnv(context);
 
   const run = await orchestrateCreative(spec, input, { env });
   const query = new URL(request.url).search;

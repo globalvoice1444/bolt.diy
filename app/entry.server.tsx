@@ -1,7 +1,19 @@
-import type { AppLoadContext } from '@remix-run/cloudflare';
+import type { AppLoadContext } from '@remix-run/node';
 import { RemixServer } from '@remix-run/react';
 import { isbot } from 'isbot';
-import { renderToReadableStream } from 'react-dom/server';
+
+/*
+ * The Web-streams renderer, imported from the entry that actually provides it
+ * under Node.
+ *
+ * `react-dom/server` resolves to the CommonJS Node build, which exports
+ * `renderToPipeableStream` and no `renderToReadableStream` — importing the
+ * latter from it fails at module load, which is why the Cloudflare-era build
+ * could not boot on Node at all. The `.browser` entry is the Web-streams
+ * build; Node 18+ has global Web Streams, so it runs there unchanged and this
+ * file keeps streaming exactly as it did on Workers.
+ */
+import { renderToReadableStream } from 'react-dom/server.browser';
 import { renderHeadToString } from 'remix-island';
 import { Head } from './root';
 import { themeStore } from '~/lib/stores/theme';

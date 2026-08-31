@@ -1,6 +1,6 @@
-import { cloudflareDevProxyVitePlugin as remixCloudflareDevProxy, vitePlugin as remixVitePlugin } from '@remix-run/dev';
+import { vitePlugin as remixVitePlugin } from '@remix-run/dev';
 import UnoCSS from 'unocss/vite';
-import { defineConfig, type ViteDevServer } from 'vite';
+import { defineConfig, type PluginOption, type UserConfig, type ViteDevServer } from 'vite';
 import { nodePolyfills } from 'vite-plugin-node-polyfills';
 import { optimizeCssModules } from 'vite-plugin-optimize-css-modules';
 import tsconfigPaths from 'vite-tsconfig-paths';
@@ -20,16 +20,18 @@ export default defineConfig((config) => {
       target: 'esnext',
     },
     plugins: [
-      nodePolyfills({
-        include: ['buffer', 'process', 'util', 'stream'],
-        globals: {
-          Buffer: true,
-          process: true,
-          global: true,
-        },
-        protocolImports: true,
-        exclude: ['child_process', 'fs', 'path'],
-      }),
+      clientOnly(
+        nodePolyfills({
+          include: ['buffer', 'process', 'util', 'stream'],
+          globals: {
+            Buffer: true,
+            process: true,
+            global: true,
+          },
+          protocolImports: true,
+          exclude: ['child_process', 'fs', 'path'],
+        }),
+      ),
       {
         name: 'buffer-polyfill',
         transform(code, id) {
@@ -43,7 +45,6 @@ export default defineConfig((config) => {
           return null;
         },
       },
-      config.mode !== 'test' && remixCloudflareDevProxy(),
       remixVitePlugin({
         future: {
           v3_fetcherPersist: true,
@@ -57,6 +58,12 @@ export default defineConfig((config) => {
       chrome129IssuePlugin(),
       config.mode === 'production' && optimizeCssModules({ apply: 'build' }),
     ],
+    resolve: {
+      alias: {
+        /* Node's HTTP client has no place in a browser bundle. See empty-module.ts. */
+        undici: '/app/lib/empty-module.ts',
+      },
+    },
     envPrefix: [
       'VITE_',
       'OPENAI_LIKE_API_BASE_URL',
@@ -84,6 +91,33 @@ export default defineConfig((config) => {
     },
   };
 });
+
+/**
+ * Keep a browser polyfill out of the server build.
+ *
+ * `nodePolyfills` was applied to both builds, so the SSR bundle imported
+ * `vite-plugin-node-polyfills/shims/process` — a browser stub whose `cwd()` is
+ * `/` and whose `env` is empty. On a real Node server that is quietly
+ * catastrophic: the asset store and fact snapshot resolve their roots from
+ * `process.cwd()` and land somewhere that is not the application directory, so
+ * generated images write nowhere and read back as 404s, and `process.env` never
+ * yields the OpenAI key.
+ *
+ * It stayed invisible for as long as it did because nothing ever ran the built
+ * server: on Workers every route failed earlier, and the tests and the refresh
+ * CLI use the real Node `process`.
+ *
+ * The browser genuinely needs these shims. The server never does.
+ */
+function clientOnly(plugin: PluginOption): PluginOption {
+  const plugins = Array.isArray(plugin) ? plugin : [plugin];
+
+  return plugins.map((entry) =>
+    entry && typeof entry === 'object' && 'name' in entry
+      ? { ...entry, apply: (config: UserConfig) => !config.build?.ssr }
+      : entry,
+  ) as PluginOption;
+}
 
 function chrome129IssuePlugin() {
   return {

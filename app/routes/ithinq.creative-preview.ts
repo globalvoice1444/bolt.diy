@@ -1,9 +1,10 @@
-import type { LoaderFunctionArgs } from '@remix-run/cloudflare';
+import type { LoaderFunctionArgs } from '@remix-run/node';
 import examplePageSpec from '@ithinq-pagespec/page-spec.example.json';
 import type { PageSpec } from '@ithinq-pagespec/page-spec';
 import { compilePageSpecToProjectManifest, inlineDocumentRuntime } from '~/lib/ithinq/pagespec';
 import { hasBlockingFailure, orchestrateCreative } from '~/lib/ithinq/creative-ai';
 import { readCreativeRequest } from '~/lib/ithinq/creative-ai/route-input';
+import { getRuntimeEnv } from '~/lib/ithinq/runtime-env';
 
 /**
  * Render a page produced by the full creative pipeline.
@@ -13,7 +14,7 @@ import { readCreativeRequest } from '~/lib/ithinq/creative-ai/route-input';
 export async function loader({ request, context }: LoaderFunctionArgs) {
   const input = readCreativeRequest(request);
   const spec = examplePageSpec as unknown as PageSpec;
-  const env = (context?.cloudflare?.env ?? {}) as unknown as Record<string, string | undefined>;
+  const env = getRuntimeEnv(context);
 
   const run = await orchestrateCreative(spec, input, { env });
 

@@ -1,4 +1,4 @@
-import { json, type MetaFunction } from '@remix-run/cloudflare';
+import { json, type MetaFunction } from '@remix-run/node';
 import { useLoaderData } from '@remix-run/react';
 import examplePageSpec from '@ithinq-pagespec/page-spec.example.json';
 import { compilePageSpecToProjectManifest, listDirections } from '~/lib/ithinq/pagespec';

@@ -1,4 +1,4 @@
-import type { ActionFunctionArgs, LoaderFunctionArgs } from '@remix-run/cloudflare';
+import type { ActionFunctionArgs, LoaderFunctionArgs } from '@remix-run/node';
 import examplePageSpec from '@ithinq-pagespec/page-spec.example.json';
 import {
   compilePageSpecToProjectManifest,
