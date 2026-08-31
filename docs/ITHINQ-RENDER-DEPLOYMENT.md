@@ -1,6 +1,6 @@
 # Deploying the Bolt creative engine to Render
 
-Status: **the runtime is migrated and verified locally. Nothing is deployed.**
+Status: **deployed and verified live on Render.** `srv-daave6p5efls73936jng` -> https://ithinq-bolt-renderer.onrender.com (oregon, starter, `autoDeploy: no`). `OPENAI_API_KEY` is set and one live production campaign has run end to end through Render on `gpt-4o` + `gpt-image-1` -- see *Live production smoke test* below.
 
 This records what the application actually needs at runtime, what the blocker is, and what the Render service looks like once the blocker is cleared. It is written from measurements against the merged `main`, not from reading the code and guessing.
 
@@ -41,7 +41,7 @@ Neither was visible before, because nothing had ever run the built server: on Wo
 
 **Two upstream routes used `Response.json()` as a static helper.** `remix-serve` calls `installGlobals()`, which replaces Node's native `Response` with undici's, and that one has no static `json`. `api.check-env-key` and `api.export-api-keys` now use Remix's own `json()` helper, as every other route in the codebase already did.
 
-## The Render service## The Render service
+## The Render service
 
 One **Web Service**. Nothing here needs a second service: the same process serves the frontend, the loaders and the generated-image route, and splitting them would only add a network hop between a page and its own images.
 
@@ -49,7 +49,7 @@ One **Web Service**. Nothing here needs a second service: the same process serve
 |---|---|
 | Type | Web Service (Node) |
 | Runtime | Node 22 — `engines` says `>=18.18.0`, the Dockerfile builds on `node:22-bookworm-slim` |
-| Build | `pnpm install --frozen-lockfile && NODE_OPTIONS=--max-old-space-size=8192 pnpm run build` |
+| Build | `corepack enable && pnpm install --frozen-lockfile --prod=false && NODE_OPTIONS=--max-old-space-size=8192 pnpm run build` — `--prod=false` is required; see *What the first real deploy exposed* |
 | Start | `pnpm run start` → `remix-serve ./build/server/index.js` |
 | Health check | `/api/health` — already exists, returns `{status, timestamp}`, calls nothing and costs nothing |
 | Output | `build/client` (static) and `build/server` (SSR bundle) |
@@ -64,7 +64,8 @@ The build needs the larger heap. The default 2GB OOMs on this bundle; that is pr
 |---|---|---|
 | `OPENAI_API_KEY` | **Required** for authorship | Server-side only. Without it the engine degrades to the document's own copy and placeholder imagery — it does not crash |
 | `PORT` | **Required** | Supplied by Render |
-| `NODE_ENV=production` | Required | |
+| `NODE_ENV=production` | Required | Applies to the **build** as well as the runtime on Render, which is why the install must force `--prod=false` |
+| `HUSKY=0` | Required | Stops the git-hook installer from failing the build |
 | `ITHINQ_WEBSITE_ORIGIN` | Optional | Defaults to `https://ithinq.ai`. Cannot widen the fact host ceiling, which is closed in code |
 | `ITHINQ_WEBSITE_PATHS` | Optional | Overrides the approved page list |
 | `NODE_OPTIONS=--max-old-space-size=8192` | Build-time | |
@@ -150,6 +151,76 @@ With `OPENAI_API_KEY` set, one controlled request through the production server 
 
 No 500s, no Cloudflare context, no Ajv restriction, no missing render API, no Wrangler.
 
+## What the first real deploy exposed
+
+Two defects that only a real Render build could surface. Both were in the merged blueprint, and neither could have been caught locally: they are artifacts of *where* Render puts the environment, not of the code.
+
+**Render applies service environment variables to the build, not just the runtime.** `NODE_ENV=production` therefore reached `pnpm install`, which skipped `devDependencies`. The first build died 20 seconds in:
+
+```
+devDependencies: skipped because NODE_ENV is set to production
+> husky
+sh: 1: husky: not found
+ ELIFECYCLE  Command failed.
+```
+
+The husky `prepare` script was only the first thing to break. `vite`, `@remix-run/dev` (which *runs* the build) and `@remix-run/serve` (which *runs* the start command) are all `devDependencies` too, so the build and the start command could not have succeeded either. `pnpm install --frozen-lockfile --prod=false` is now load-bearing and commented as such in `render.yaml`.
+
+**A git-hook installer could fail a deploy.** `HUSKY=0` is now set. Hooks have no purpose on a build machine, and nothing that irrelevant should be able to gate a release.
+
+The 8GB build heap was *not* the problem, contrary to the risk flagged before the first attempt. The corrected build reached `live` in ~220s.
+
+**This was also the first Linux production build to pass in its real target environment.** The repo is developed on Windows, and its `node_modules` there carries win32-only rollup/esbuild binaries. Render built it on Linux from a clean clone with `pnpm install --frozen-lockfile --prod=false`: the Linux native binaries resolved, the bundle built, and the production Node server (`remix-serve`) came up and bound Render's `PORT` on all interfaces. `remix-serve` reads `PORT` (`cli.js:65`) and calls `app.listen(port, onListen)` with no host (`cli.js:142`), which binds every interface -- so no `HOST` variable is needed and none is set.
+
+## Live verification, against the deployed service (before the key was set)
+
+Measured against https://ithinq-bolt-renderer.onrender.com after the first successful deploy reached `live`, while `OPENAI_API_KEY` was still unset. Kept because it is the record of how the engine behaves *without* a key -- which is a supported mode, not just a stepping stone. The post-key run is in the next section; all guard results below were re-verified there and still hold.
+
+| Route | Result |
+|---|---|
+| `/api/health` | 200 `{"status":"healthy","timestamp":...}` |
+| `/` | 200 |
+| `/ithinq/pagespec` | 200 |
+| `/favicon.svg` | 200 |
+| `/ithinq/campaign-preview` | 200, 22,048 bytes, full campaign rendered |
+| `/ithinq/generated/:id` | 200 `image/svg+xml` |
+| `/ithinq/generated/not-hex` | 404 |
+| `/ithinq/generated/../../package.json` | 404, sent with `curl --path-as-is` so the traversal reached the server literally rather than being collapsed by the client |
+| `/ithinq/generated/ZZZZZZZZ` | 404 |
+| `/api/check-env-key?provider=OpenAI` | 200 `{"isSet":false}` |
+
+The traversal guard is `/^[0-9a-f]{8,64}$/` in `asset-store.ts:67`, checked before the filesystem is touched.
+
+**At this point the engine was running in its degraded mode, and degrading exactly as designed.** With no `OPENAI_API_KEY` on the service, `check-env-key` reported `isSet:false`, the headline is the document's own copy (*"iThinq AI Voice Assistant for med spas"*) rather than authored copy, and imagery is served as placeholder SVG rather than `gpt-image-1` PNGs. Nothing 404s and nothing crashes -- the placeholder assets are content-addressed and served back correctly. That `isSet:false` also proves `process.env` reaches the server loaders, which is the thing the Cloudflare-to-Node migration was for.
+
+`OPENAI_API_KEY` has since been set on the service (it is `sync: false` in the blueprint, so Render prompts for it and stores it in the service environment) and a live campaign has been run -- see below.
+
+## Live production smoke test
+
+One controlled request through the deployed service on 2026-08-31, after `OPENAI_API_KEY` was set and the service redeployed to pick it up.
+
+**Setting the variable is not enough — the running process must be restarted.** With the key saved on the service but no new deploy, `/api/check-env-key?provider=OpenAI` still reported `{"isSet":false}`: the live process had been started before the variable existed. A deploy from `main` fixed it, and the same endpoint then reported `{"isSet":true}`.
+
+| | |
+|---|---|
+| Request | `GET /ithinq/campaign-preview` (no params, so `DEFAULT_BRIEF` -- the flagship med-spa campaign) |
+| Result | **200**, 23,704 bytes, `text/html; charset=utf-8` |
+| Wall time | **120.1s**, not cut off |
+| Headline | *"Elegant communication for your med spa"* -- authored. The no-key run produced *"iThinq AI Voice Assistant for med spas"*, the document's own copy |
+| Imagery | 2 × `gpt-image-1` PNG, `1536×1024` and `1024×1536`, ~2.2MB each |
+| Image serving | Both 200 `image/png`, valid PNG magic, `X-Content-Type-Options: nosniff`, `Cross-Origin-Resource-Policy: same-origin` |
+| Rendered content | Inspected visually: a med-spa reception desk and a practitioner with a client. Coherent, on-brief, not artefacts |
+| Partner disclosure | Intact -- *"This page is shared by an independent iThinq AI Partner, who may be compensated if you become a customer."* |
+
+Authored copy sampled across the page: *"Call handling with confidence"*, *"Designed with med spas in mind"*, *"Assurance with every call"*, *"Your questions, answered"*, *"Will it replace my staff?"*.
+
+The whole pipeline therefore ran in production: brief → strategy → website facts → selection → `gpt-4o` authorship → guard → claim audit → asset planning → `gpt-image-1` → composition → served page and served bytes.
+
 ## Readiness
 
-Ready for a smoke deployment. Durable storage for generated imagery remains the one thing to solve before Partner-facing use.
+Deployed, and smoke-tested end to end against the real models. `OPENAI_API_KEY` is set on the service and a live `gpt-4o` + `gpt-image-1` campaign has been served. Two things remain before Partner-facing use:
+
+- **Durable storage for generated imagery.** `.data/` is instance-local and does not survive a redeploy, so the PNGs from the run above are lost on the next deploy and the page that references them will 404. This is the one hard blocker.
+- **`/ithinq/campaign-preview` takes ~120s and has no margin.** The live run above returned 200 in 120.1s, so the feared ~100s proxy cut did **not** occur -- that risk was overstated. But a synchronous route that holds a connection for two minutes with zero bytes written is still fragile: it is at the mercy of proxy defaults nobody here controls, and it gives the caller no progress signal. Streaming or a background job is still the right shape before Partner traffic, now as a robustness matter rather than a known breakage.
+
+`autoDeploy` is `no`: deploys are triggered deliberately, never by a push to `main`.
