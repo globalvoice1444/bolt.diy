@@ -17,9 +17,10 @@ export async function loader({ request, context }: LoaderFunctionArgs) {
     // Presentation-only input; an unusable URL falls back to the demo brief.
   }
 
-  const spec = demoSpec(specId).spec;
+  const demo = demoSpec(specId);
+  const spec = demo.spec;
   const env = (context?.cloudflare?.env ?? {}) as unknown as Record<string, string | undefined>;
-  const run = await runCampaign(spec, { userInstruction: instruction }, { env });
+  const run = await runCampaign(spec, { userInstruction: instruction }, { env, factSet: demo.factSet });
   const { copy, generatedMedia } = campaignRenderInputs(run);
 
   const { manifest } = compilePageSpecToProjectManifest(spec, {

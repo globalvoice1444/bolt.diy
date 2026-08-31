@@ -1,31 +1,67 @@
+import { FACT_REFERENCE_PATTERN } from '@ithinq-pagespec/page-spec';
+import type { ApprovedFact } from './facts';
+
 /**
- * The truth guard for generated copy.
+ * The truth guard for authored campaign copy.
  *
- * Phase 3 lets a model write marketing copy. That is a genuine widening of
- * what the renderer may do, so it needs a hard boundary rather than a polite
- * instruction in a prompt: a model told "do not invent facts" will still
- * occasionally invent one, and a page that states a false capability, price or
- * result is the single worst thing this system could produce.
+ * Phase 3's rule was that generated copy could only rephrase what the PageSpec
+ * already said. That was safe and it was also the ceiling: a Partner who has
+ * not already written the page has nothing to rephrase, so the system could
+ * never author a campaign.
  *
- * The rule is deliberately blunt and fails safe: generated copy may only
- * REPHRASE what the PageSpec already says. Any candidate string that
- * introduces a number, a currency amount, or a piece of evidence vocabulary
- * that does not appear in its own source material is rejected, and the
- * original contract copy is rendered instead.
+ * Phase 4 moves the boundary from WORDING to CLAIMS. The writer may say
+ * anything, in any structure, at any length. What it may not do is assert a
+ * business fact that no approved fact supports.
  *
- * Rejection is not an error. Losing a rewritten headline costs nothing;
- * shipping an invented statistic costs everything.
+ * So this file checks the things that are genuinely checkable in code —
+ * figures, money, evidence vocabulary, fact references, house style — and the
+ * claim audit checks what only a reader can: whether a sentence asserts
+ * something the fact set does not say. Neither is a compliance engine.
+ * Original phrasing, metaphor, rhetorical questions, emotional framing,
+ * urgency, narrative and creative CTA language are all deliberately none of
+ * this file's business.
  */
 export interface CopyFinding {
   field: string;
-  code: 'novel_number' | 'novel_currency' | 'evidence_claim' | 'cliche' | 'too_long' | 'empty';
+  code:
+    | 'novel_number'
+    | 'novel_currency'
+    | 'evidence_claim'
+    | 'cliche'
+    | 'too_long'
+    | 'empty'
+    | 'unknown_fact_ref'
+    | 'unsupported_claim';
   detail: string;
+}
+
+/**
+ * What a field is allowed to rest on.
+ *
+ * `supported` is the approved fact set plus the document's own authored text.
+ * Both are authoritative: the facts come from the fact authority, and the
+ * PageSpec is the Growth Engine's own artifact. Everything else is the
+ * writer's to invent, because everything else is language rather than truth.
+ */
+export interface SupportContext {
+  supported: readonly string[];
+  knownRefs: ReadonlySet<string>;
+}
+
+export function supportContext(facts: readonly ApprovedFact[], documentText: readonly string[]): SupportContext {
+  return {
+    supported: [...facts.map((fact) => fact.text), ...documentText],
+    knownRefs: new Set(facts.map((fact) => fact.ref)),
+  };
 }
 
 /**
  * Vocabulary that asserts external validation rather than describing a
  * product. These are the shapes fabricated evidence takes: awards, ratings,
  * certifications, guarantees, proof claims and borrowed social proof.
+ *
+ * Still banned unless an approved fact actually says it. A fact set may
+ * legitimately contain a guarantee; a model may not decide there is one.
  */
 const EVIDENCE_LEXICON = [
   'guarantee',
@@ -60,14 +96,13 @@ const EVIDENCE_LEXICON = [
 /**
  * Marketing filler the brief explicitly asks the writer to avoid.
  *
- * A quality guard rather than a truth guard, but enforced in the same place
- * and for the same reason: a live run produced "Elevate your med spa" and
- * "effortless integration" despite the prompt banning both by name. A model
- * told not to use a word will still reach for it, so the ban has to be
- * checked rather than requested.
+ * A quality guard rather than a truth guard, kept because a live Phase 3 run
+ * produced "Elevate your med spa" and "effortless integration" despite the
+ * prompt banning both by name. A model told not to use a word will still reach
+ * for it, so the ban is checked rather than requested.
  *
- * A term is allowed when the source material already uses it — the contract's
- * own voice is never overridden by this list.
+ * Allowed when the supporting material already uses the term: the fact
+ * authority's own voice is never overridden by this list.
  */
 const CLICHE_LEXICON = [
   'transform',
@@ -95,7 +130,6 @@ function normalise(value: string): string {
   return value.toLowerCase().replace(/\s+/g, ' ');
 }
 
-/** Numbers written as digits, plus spelled-out small numbers that read as counts. */
 function numbersIn(value: string): string[] {
   return (value.match(/\d[\d,.]*\s*%?/g) ?? []).map((token) => token.replace(/[\s,]/g, '').replace(/\.$/, ''));
 }
@@ -105,24 +139,24 @@ function currencyIn(value: string): string[] {
 }
 
 /**
- * Check one generated string against the material it was allowed to draw on.
+ * Check one authored string against what supports it.
  *
- * `source` is every piece of contract text the model was shown for this field.
- * A finding means the candidate must be discarded.
+ * A finding means the candidate must be discarded. Note what is NOT checked:
+ * whether the wording appears in the source. It deliberately does not have to.
  */
-export function guardCopy(field: string, candidate: string, source: readonly string[], maxLength = 320): CopyFinding[] {
+export function guardCopy(field: string, candidate: string, support: SupportContext, maxLength = 320): CopyFinding[] {
   const findings: CopyFinding[] = [];
   const text = candidate.trim();
 
   if (!text) {
-    return [{ field, code: 'empty', detail: 'Generated copy was empty.' }];
+    return [{ field, code: 'empty', detail: 'Authored copy was empty.' }];
   }
 
   if (text.length > maxLength) {
-    findings.push({ field, code: 'too_long', detail: `Generated copy exceeded ${maxLength} characters.` });
+    findings.push({ field, code: 'too_long', detail: `Authored copy exceeded ${maxLength} characters.` });
   }
 
-  const haystack = normalise(source.join(' \n '));
+  const haystack = normalise(support.supported.join(' \n '));
   const haystackNumbers = new Set(numbersIn(haystack));
 
   for (const number of numbersIn(text)) {
@@ -130,7 +164,7 @@ export function guardCopy(field: string, candidate: string, source: readonly str
       findings.push({
         field,
         code: 'novel_number',
-        detail: `Introduced the figure "${number}", which does not appear in the source material.`,
+        detail: `Introduced the figure "${number}", which no approved fact supports.`,
       });
     }
   }
@@ -142,7 +176,7 @@ export function guardCopy(field: string, candidate: string, source: readonly str
       findings.push({
         field,
         code: 'novel_currency',
-        detail: `Introduced the amount "${amount}", which does not appear in the source material.`,
+        detail: `Introduced the amount "${amount}", which no approved fact supports.`,
       });
     }
   }
@@ -154,7 +188,7 @@ export function guardCopy(field: string, candidate: string, source: readonly str
       findings.push({
         field,
         code: 'evidence_claim',
-        detail: `Used the evidence term "${term}", which does not appear in the source material.`,
+        detail: `Used the evidence term "${term}", which no approved fact supports.`,
       });
     }
   }
@@ -164,7 +198,29 @@ export function guardCopy(field: string, candidate: string, source: readonly str
       findings.push({
         field,
         code: 'cliche',
-        detail: `Used the marketing cliché "${term}", which the brief bans and the source does not use.`,
+        detail: `Used the marketing cliché "${term}", which the brief bans and no approved fact uses.`,
+      });
+    }
+  }
+
+  return findings;
+}
+
+/**
+ * Check the fact references a section declared.
+ *
+ * Structural, not semantic: it proves the writer pointed at facts that exist.
+ * Whether the copy actually follows from them is the audit's job.
+ */
+export function guardFactRefs(field: string, refs: readonly string[], support: SupportContext): CopyFinding[] {
+  const findings: CopyFinding[] = [];
+
+  for (const ref of refs) {
+    if (!FACT_REFERENCE_PATTERN.test(ref) || !support.knownRefs.has(ref)) {
+      findings.push({
+        field,
+        code: 'unknown_fact_ref',
+        detail: `Cited "${ref}", which is not a reference in the approved fact set.`,
       });
     }
   }
@@ -175,13 +231,14 @@ export function guardCopy(field: string, candidate: string, source: readonly str
 /**
  * Apply the guard to a candidate, returning the text only when it is safe.
  *
- * Callers fall back to the contract's own copy when this returns null, so a
- * rejected rewrite degrades to authoritative truth rather than to nothing.
+ * Callers fall back to whatever the document already had when this returns
+ * null, so a rejected line degrades toward authoritative truth rather than
+ * toward nothing.
  */
 export function safeCopy(
   field: string,
   candidate: string | undefined | null,
-  source: readonly string[],
+  support: SupportContext,
   findings: CopyFinding[],
   maxLength?: number,
 ): string | null {
@@ -189,7 +246,7 @@ export function safeCopy(
     return null;
   }
 
-  const issues = guardCopy(field, candidate, source, maxLength);
+  const issues = guardCopy(field, candidate, support, maxLength);
 
   if (issues.length > 0) {
     findings.push(...issues);

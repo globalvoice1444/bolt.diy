@@ -1,6 +1,8 @@
 # iThinq AI creative intelligence (Phase 3)
 
-Status: on `ithinq/ai-creative-intelligence`. Not merged, not deployed, not connected to the Partner Network.
+Status: merged to `main` (PR #4, merge commit `ed23f7b`, 2026-08-31). Not deployed, and not connected to the
+Partner Network. Phase 4 ([`ITHINQ-AI-CAMPAIGN-AUTHORSHIP.md`](./ITHINQ-AI-CAMPAIGN-AUTHORSHIP.md)) supersedes
+the copy model described below: generated copy is no longer limited to rephrasing the PageSpec's own sentences.
 
 Phase 2 ([`ITHINQ-AI-CREATIVE-ORCHESTRATION.md`](./ITHINQ-AI-CREATIVE-ORCHESTRATION.md)) proved that generated imagery could travel a real pipeline. Phase 3 makes the system read a plain-language brief and do the creative work.
 
@@ -71,9 +73,12 @@ To show a genuine vertical contrast, `demo-specs.ts` carries a second document �
 
 Engineering and product review only. No Partner authentication, no production UI.
 
-## Where copy authorship is going
+## Where copy authorship went
 
-Phase 3 generates *expression* around supplied truth. That is the right scope for this phase, and it is **not** the intended end state.
+Phase 3 generates *expression* around supplied truth. That was the right scope for that phase, and it was **not** the
+intended end state. **Phase 4 closed this seam** — see
+[`ITHINQ-AI-CAMPAIGN-AUTHORSHIP.md`](./ITHINQ-AI-CAMPAIGN-AUTHORSHIP.md). The section below is the plan it followed,
+kept because it is an accurate record of how the seam was left.
 
 The accepted product direction is:
 
@@ -100,7 +105,7 @@ What that step needs, and what this phase does not attempt, is the approved fact
 
 ## Current limitations
 
-- Copy is rephrasing rather than original authorship for now; see the section above for where that goes and why the seam is already in place.
+- ~~Copy is rephrasing rather than original authorship for now~~ — **resolved in Phase 4.** The remaining limitations below still hold unless the Phase 4 document says otherwise.
 - **Interpretation is non-deterministic.** The brief is read by a model at temperature 0.4, so the same brief can select a different — still appropriate — direction between runs; a premium med-spa brief has resolved to both `editorial-luxe` and `clinical-calm`. Everything downstream of interpretation is fully deterministic: given a fixed interpretation, five runs produce one identical plan. Pin `creativeDirection` explicitly when a specific direction is required.
 - **Generated lettering is reduced, not eliminated.** Prompts state positively that surfaces are blank and unbranded and also list the exclusions, but the image model still occasionally renders incidental signage — a live run produced a job board reading "HOME SERVICES". It has not produced a brand name, statistic or award, and the truth guards do not cover pixels. Treat generated imagery as reviewable creative, not as unattended output.
 - Two model calls per campaign (interpretation, copy), sequential with image generation. No batching, retry or streaming.

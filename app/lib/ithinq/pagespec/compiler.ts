@@ -75,6 +75,7 @@ export function compilePageSpecToProjectManifest(
   const generatedMedia = options?.generatedMedia ?? [];
   const plan = planPresentation(spec as PageSpec, validation.skipSections, {
     ...options,
+    copy: options?.copy,
     generatedAssetNeedIds: options?.generatedAssetNeedIds ?? generatedMedia.map((item) => item.assetNeedId),
   });
   const direction = getDirection(plan.directionId);

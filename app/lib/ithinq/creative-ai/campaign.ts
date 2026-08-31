@@ -2,7 +2,8 @@ import type { PageSpec } from '@ithinq-pagespec/page-spec';
 import type { CopyText } from '~/lib/ithinq/pagespec/creative';
 import { assetIdFor, devAssetStore, type AssetStore } from './asset-store';
 import { planAssetNeeds, type AssetNeed } from './asset-need';
-import { generateCopy, type CopyResult } from './copy';
+import { authorCampaignCopy, type CopyResult } from './copy';
+import { factCoverage, EMPTY_FACT_SET, type ApprovedFactSet, type FactCoverage } from './facts';
 import { interpretBrief, type InterpretedRequest } from './interpret';
 import { buildImagePrompt } from './prompt';
 import type { CreativeRequestInput } from './request';
@@ -22,6 +23,12 @@ export interface CampaignFailure {
 export interface CampaignRun {
   request: InterpretedRequest;
   strategy: CreativeStrategy;
+
+  /** The facts this campaign was allowed to assert. */
+  factSet: ApprovedFactSet;
+
+  /** How well the fact set covers the document. Diagnostics, never a gate. */
+  coverage: FactCoverage;
   copy: CopyResult;
   needs: AssetNeed[];
   assets: GeneratedAsset[];
@@ -34,6 +41,15 @@ export interface CampaignRun {
 
 export interface CampaignOptions {
   env?: Record<string, string | undefined>;
+
+  /**
+   * The approved fact set for this document.
+   *
+   * Without one the writer has nothing to assert from, so the page keeps the
+   * document's own copy. That is the correct degradation: a campaign with no
+   * fact authority behind it should not be written at all.
+   */
+  factSet?: ApprovedFactSet;
   imageGenerator?: CreativeAssetGenerator;
   textGenerator?: StructuredTextGenerator | null;
   store?: AssetStore;
@@ -43,14 +59,16 @@ export interface CampaignOptions {
 }
 
 /**
- * The whole Phase 3 flow.
+ * The whole campaign flow.
  *
- * brief -> interpretation -> strategy -> copy -> asset needs -> images.
+ * brief -> interpretation -> strategy -> approved facts -> authored copy
+ *       -> claim audit -> asset needs -> images.
  *
  * Each stage degrades independently: without a text model the deterministic
- * reader still produces a strategy and the contract's own copy still renders;
- * without an image model the page renders typographically. A campaign never
- * fails as a whole because one model was unavailable.
+ * reader still produces a strategy and the document's own copy still renders;
+ * without an image model the page renders typographically; without a fact set
+ * nothing is authored. A campaign never fails as a whole because one model was
+ * unavailable.
  */
 export async function runCampaign(
   spec: PageSpec,
@@ -61,11 +79,24 @@ export async function runCampaign(
   const textGenerator = options.textGenerator === undefined ? resolveTextGenerator(env) : options.textGenerator;
   const imageGenerator = options.imageGenerator ?? resolveGenerator(env);
   const store = options.store ?? devAssetStore;
+  const factSet = options.factSet ?? EMPTY_FACT_SET;
   const failures: CampaignFailure[] = [];
 
   const request = await interpretBrief(input, textGenerator);
   const strategy = deriveCreativeStrategy(spec, request);
-  const copy = await generateCopy(spec, request, strategy, textGenerator);
+  const coverage = factCoverage(spec, factSet);
+  const copy =
+    factSet.facts.length > 0
+      ? await authorCampaignCopy(spec, factSet, request, strategy, textGenerator)
+      : {
+          overlay: { sections: [] },
+          plan: null,
+          findings: [],
+          rejected: 0,
+          accepted: 0,
+          generated: false,
+          audited: false,
+        };
 
   for (const finding of copy.findings) {
     failures.push({
@@ -124,6 +155,8 @@ export async function runCampaign(
   return {
     request,
     strategy,
+    factSet,
+    coverage,
     copy,
     needs,
     assets,
@@ -141,7 +174,8 @@ export function campaignRenderInputs(run: CampaignRun): {
   generatedMedia: Array<{ assetNeedId: string; url: string; alt: string }>;
 } {
   const hasCopy =
-    Boolean(run.copy.overlay.headline || run.copy.overlay.subheadline) || run.copy.overlay.sections.length > 0;
+    Boolean(run.copy.overlay.headline || run.copy.overlay.subheadline || run.copy.overlay.audience) ||
+    run.copy.overlay.sections.length > 0;
 
   return {
     copy: hasCopy ? run.copy.overlay : undefined,

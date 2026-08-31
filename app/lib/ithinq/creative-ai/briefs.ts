@@ -1,5 +1,11 @@
-/** Demo briefs used by the Phase 3 reviewer surface. */
+/** Demo briefs used by the reviewer surface. */
 export const DEMO_BRIEFS = [
+  {
+    id: 'med-spa-campaign',
+    label: 'Med Spa · the flagship request',
+    instruction:
+      'Create the best converting campaign for Med Spas promoting the iThinq AI Voice Assistant. Make it premium, persuasive, image-forward, and strong enough to use as a real campaign page.',
+  },
   {
     id: 'med-spa',
     label: 'Med Spa · premium',

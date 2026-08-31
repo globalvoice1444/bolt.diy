@@ -1,0 +1,146 @@
+{
+  "specVersion": "1.0",
+  "page": {
+    "reference": "spec:med-spa:approved-facts",
+    "origin": "generated",
+    "campaign": "demo:med-spa:authorship-from-facts",
+    "vertical": "med-spa",
+    "situation": "inbound-enquiries-go-unanswered",
+    "awareness": "problem-aware",
+    "sophistication": 2,
+    "templateKey": null,
+    "name": "Med Spa — approved facts",
+    "audience": "Med spa owners and practice managers",
+    "headline": "iThinq AI Voice Assistant for med spas",
+    "subheadline": "Answering, intake and follow-up for inbound calls."
+  },
+  "partner": {
+    "displayName": "Example Partner",
+    "businessName": null,
+    "introduction": null
+  },
+  "ctas": {
+    "primary": {
+      "label": "Book a demo",
+      "url": "https://ithinq.ai/demo?ref=8f14e45f-ce7a-4a5b-9f2d-0c1b2a3d4e5f",
+      "role": "primary",
+      "carriesAttribution": true
+    },
+    "secondary": {
+      "label": "See iThinq AI",
+      "url": "https://ithinq.ai/?ref=8f14e45f-ce7a-4a5b-9f2d-0c1b2a3d4e5f",
+      "role": "secondary",
+      "carriesAttribution": true
+    }
+  },
+  "disclosure": {
+    "text": "This page is shared by an independent iThinq AI Partner, who may be compensated if you become a customer.",
+    "placement": "footer"
+  },
+  "policy": {
+    "allowedLinkHosts": ["ithinq.ai", "partners.ithinq.ai"]
+  },
+  "sections": [
+    {
+      "kind": "scenario",
+      "purpose": "create_recognition",
+      "emphasis": "support",
+      "heading": "Situation",
+      "body": "Calls arrive while the team is with clients.",
+      "provenance": {
+        "factRefs": []
+      }
+    },
+    {
+      "kind": "pain",
+      "purpose": "intensify_problem",
+      "emphasis": "support",
+      "heading": "Problem",
+      "body": "Enquiries that are not answered are not captured.",
+      "provenance": {
+        "factRefs": []
+      }
+    },
+    {
+      "kind": "mechanism",
+      "purpose": "explain_mechanism",
+      "emphasis": "lead",
+      "heading": "What it does",
+      "body": "Answers inbound calls. Takes the caller through the questions the team would ask about a consultation enquiry. Captures the enquiry and hands it back in a form the practice can act on. Asks the same questions in the same order whoever is on shift. Keeps follow-up moving after the call has ended. Answers calls outside opening hours where the setup supports it, which depends on how it is configured.",
+      "provenance": {
+        "factRefs": [
+          "f_65208cb70807c023be72fb14759c35fcc709cfd7f530fa1c2da43bdb413b7d6b",
+          "f_3a2e093c74946166ad21c428262935a2a70a1fe59c10302f2e499aec57ac532d",
+          "f_5c9f0e28a9a042d6581ac52430326f8d0e2862ab10a83611bf6f4dcb44ad3f98",
+          "f_2fb4fe1335c4b7fe5fcc3e71ff4982d5ebdd8b8e0986e992253feb43c8e6a9ff",
+          "f_8ce1d5641d6c89c5950f3679e50e07a79f8ae7c7f127a6b918cc7eacc9f35e18",
+          "f_6a1fb4df7d3db619e410036de81ec1691dab565b1b3a1c4343116d0888194529"
+        ]
+      }
+    },
+    {
+      "kind": "vertical_fit",
+      "purpose": "establish_fit",
+      "emphasis": "support",
+      "heading": "Who it is for",
+      "items": [
+        "It is built for service businesses that take enquiries and bookings over the phone.",
+        "Med spas and aesthetics clinics are a target market.",
+        "Typical callers are prospective patients enquiring about a consultation."
+      ],
+      "provenance": {
+        "factRefs": [
+          "f_0963f74f89a4ed5b99f40be35c4fea39bad6375845545c461b34c5860e0ec4ea",
+          "f_143878727b81065765707852156f7eba2fdba402533e8b2c608bad293e010590",
+          "f_620369ef6dbc7cb8d54a7b5cddafc1a87e038f8ed89f9a179c15d67a06a1e579"
+        ]
+      }
+    },
+    {
+      "kind": "risk",
+      "purpose": "reduce_risk",
+      "emphasis": "support",
+      "heading": "Limits",
+      "body": "Helps with the enquiries around care rather than giving clinical advice. Does not replace the people who take the conversations that need a person. The product is shown on a demo call before a practice commits to it.",
+      "provenance": {
+        "factRefs": [
+          "f_b18e09b6361cea88a35f7f4b15ee67ef0a287325f17c2ae58f52218302691059",
+          "f_ba49ad6d4788d69d60565968e25db87e57e607d89ec568c85a93096ad2b7eb12",
+          "f_5dc0b43072f0b5f1f25a4185c7e64f72bf04b8ab629fba63bab4bc7f06d34bf9"
+        ]
+      }
+    },
+    {
+      "kind": "faq",
+      "purpose": "handle_objection",
+      "emphasis": "support",
+      "heading": "Questions",
+      "qa": [
+        {
+          "question": "Does it replace the team?",
+          "answer": "Does not replace the people who take the conversations that need a person."
+        },
+        {
+          "question": "Does it answer out of hours?",
+          "answer": "Answers calls outside opening hours where the setup supports it, which depends on how it is configured."
+        },
+        {
+          "question": "How is it evaluated?",
+          "answer": "The product is shown on a demo call before a practice commits to it."
+        },
+        {
+          "question": "What is it?",
+          "answer": "The iThinq AI Voice Assistant is an AI voice assistant that handles inbound phone calls for a business."
+        }
+      ],
+      "provenance": {
+        "factRefs": [
+          "f_ba49ad6d4788d69d60565968e25db87e57e607d89ec568c85a93096ad2b7eb12",
+          "f_6a1fb4df7d3db619e410036de81ec1691dab565b1b3a1c4343116d0888194529",
+          "f_5dc0b43072f0b5f1f25a4185c7e64f72bf04b8ab629fba63bab4bc7f06d34bf9",
+          "f_784924827248384e7f5977a873ec58e5aa236c78d04e50b2919d9546f3350f3c"
+        ]
+      }
+    }
+  ]
+}

@@ -1,4 +1,5 @@
 import type { Emphasis, PageSpec, PageSpecSection } from '@ithinq-pagespec/page-spec';
+import { effectiveSection, sectionCopyAt, type CopyText } from './copy-text';
 import { getDirection, type CompositionPolicy, type CreativeDirection } from './directions';
 import { DIRECTION_IDS, type Band, type DirectionId, type HeroVariant, type SectionLayout } from './types';
 import type {
@@ -27,6 +28,18 @@ export interface PlanOptions {
    * unknown value falls back to the derived direction rather than failing.
    */
   direction?: string;
+
+  /**
+   * Renderer-local authored copy, if any.
+   *
+   * The plan has to see what will actually be on the page. Once the writer can
+   * author a list or a Q&A for a beat the document left as bare prose, a
+   * planner reading only the PageSpec would rule out `cards` or `accordion`
+   * for content that is about to exist, and the section would render its
+   * authored items in a fallback layout. It changes which composition fits the
+   * content — never what the page is allowed to say.
+   */
+  copy?: CopyText;
 }
 
 export function isDirectionId(value: unknown): value is DirectionId {
@@ -228,11 +241,12 @@ export function planPresentation(
   let splitOccurrence = 0;
   let sawSectionMedia = false;
 
-  spec.sections.forEach((section, sourceIndex) => {
+  spec.sections.forEach((rawSection, sourceIndex) => {
     if (skip.has(sourceIndex)) {
       return;
     }
 
+    const section = effectiveSection(rawSection, sectionCopyAt(options.copy, sourceIndex));
     const layout = resolveLayout(policy, section);
     const emphasis = emphasisOf(section);
     const promoted = policy.promoteLeadSections && emphasis === 'lead';
