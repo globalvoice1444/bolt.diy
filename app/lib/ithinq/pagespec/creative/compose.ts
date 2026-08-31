@@ -1,4 +1,4 @@
-import type { Asset, Cta, PageSpec, PageSpecSection } from '@ithinq-pagespec/page-spec';
+import type { Cta, PageSpec, PageSpecSection } from '@ithinq-pagespec/page-spec';
 import type { CreativeDirection } from './directions';
 import { buildStylesheet } from './stylesheet';
 import type { CreativePresentationPlan, SectionPresentation } from './types';
@@ -43,8 +43,21 @@ function renderActions(spec: PageSpec): string {
   return `<div class="actions">${primary}${secondary}</div>`;
 }
 
+/**
+ * Renderer-local generated imagery, resolved by AssetNeed id.
+ *
+ * Structurally like a contract `Asset` but deliberately a separate channel:
+ * generated creative never enters the PageSpec, and its media origin is
+ * governed by media trust rather than by navigation trust.
+ */
+export interface GeneratedMedia {
+  assetNeedId: string;
+  url: string;
+  alt: string;
+}
+
 /** Assets are references. The URL and alt text are rendered exactly as given. */
-function renderAssetImage(asset: Asset, className: string): string {
+function renderAssetImage(asset: { url: string; alt: string }, className: string): string {
   const loading = className === 'hero__media' ? '' : ' loading="lazy" decoding="async"';
 
   return `<figure class="${className}"><img ${attr('src', asset.url)} ${attr('alt', asset.alt)}${loading}></figure>`;
@@ -174,24 +187,32 @@ function shellClass(presentation: SectionPresentation): string {
   return 'shell';
 }
 
-function renderSection(spec: PageSpec, presentation: SectionPresentation, showIndex: boolean): string {
+function renderSection(
+  spec: PageSpec,
+  presentation: SectionPresentation,
+  showIndex: boolean,
+  media: ReadonlyMap<string, GeneratedMedia>,
+): string {
   const section = spec.sections[presentation.sourceIndex];
 
   if (!section) {
     return '';
   }
 
+  const generated = presentation.generatedAssetNeedId ? media.get(presentation.generatedAssetNeedId) : undefined;
+
   let splitFlavour = 'none';
   const head = renderHead(section, presentation, showIndex);
   const body = renderBody(section, presentation);
   const items = renderItems(section, presentation);
   const qa = renderQa(section, presentation);
-  const hasAsset = Boolean(section.asset) && presentation.media !== 'none';
+  const image = section.asset ?? generated;
+  const hasAsset = Boolean(image) && presentation.media !== 'none';
 
   let inner: string;
 
   if (presentation.layout === 'editorial-split') {
-    const media = hasAsset && section.asset ? renderAssetImage(section.asset, 'layout__media') : '';
+    const mediaFigure = hasAsset && image ? renderAssetImage(image, 'layout__media') : '';
     const aside = items || qa;
 
     /*
@@ -203,11 +224,11 @@ function renderSection(spec: PageSpec, presentation: SectionPresentation, showIn
     let left: string;
     let right: string;
     let trailing = '';
-    splitFlavour = media ? 'media' : aside ? 'aside' : 'prose';
+    splitFlavour = mediaFigure ? 'media' : aside ? 'aside' : 'prose';
 
-    if (media) {
+    if (mediaFigure) {
       left = `<div class="layout__copy measure">${head}${body}</div>`;
-      right = media;
+      right = mediaFigure;
       trailing = `${items}${qa}`;
     } else if (aside) {
       left = `<div class="layout__copy measure">${head}${body}</div>`;
@@ -221,10 +242,10 @@ function renderSection(spec: PageSpec, presentation: SectionPresentation, showIn
       presentation.media === 'leading'
         ? `<div class="layout">${right}${left}</div>${trailing}`
         : `<div class="layout">${left}${right}</div>${trailing}`;
-  } else if (presentation.layout === 'media-full-bleed' && section.asset) {
+  } else if (presentation.layout === 'media-full-bleed' && image) {
     inner = `${head}${body}${items}${qa}`;
   } else {
-    const inset = hasAsset && section.asset ? renderAssetImage(section.asset, 'media-inset') : '';
+    const inset = hasAsset && image ? renderAssetImage(image, 'media-inset') : '';
     inner = `${head}${body}${items}${qa}${inset}`;
   }
 
@@ -253,9 +274,18 @@ function renderSection(spec: PageSpec, presentation: SectionPresentation, showIn
   return `${chapter}<section ${attrs}>${fullBleed}<div class="${shellClass(presentation)}">${inner}</div></section>`;
 }
 
-function renderHero(spec: PageSpec, plan: CreativePresentationPlan): string {
+function renderHero(
+  spec: PageSpec,
+  plan: CreativePresentationPlan,
+  generatedMedia: ReadonlyMap<string, GeneratedMedia>,
+): string {
   const identity = [spec.partner.displayName, spec.partner.businessName].filter(Boolean).join(' · ');
-  const heroAsset = plan.hero.mediaSourceIndex !== null ? spec.sections[plan.hero.mediaSourceIndex]?.asset : undefined;
+  const heroAsset =
+    plan.hero.mediaSourceIndex !== null
+      ? spec.sections[plan.hero.mediaSourceIndex]?.asset
+      : plan.hero.generatedAssetNeedId
+        ? generatedMedia.get(plan.hero.generatedAssetNeedId)
+        : undefined;
   const media = heroAsset ? renderAssetImage(heroAsset, 'hero__media') : '';
 
   const copy = [
@@ -319,10 +349,18 @@ function renderDisclosure(spec: PageSpec, placement: 'header' | 'inline' | 'foot
  * is authored and must not be reordered, merged or split, so presentation
  * varies the treatment of each section, never its position.
  */
-export function composeDocument(spec: PageSpec, plan: CreativePresentationPlan, direction: CreativeDirection): string {
+export function composeDocument(
+  spec: PageSpec,
+  plan: CreativePresentationPlan,
+  direction: CreativeDirection,
+  generatedMedia: readonly GeneratedMedia[] = [],
+): string {
+  const mediaByNeed = new Map(generatedMedia.map((item) => [item.assetNeedId, item]));
   const identity = [spec.partner.displayName, spec.partner.businessName].filter(Boolean).join(' · ');
   const showIndex = direction.id === 'editorial-luxe' || direction.id === 'service-bold';
-  const sections = plan.sections.map((presentation) => renderSection(spec, presentation, showIndex)).join('');
+  const sections = plan.sections
+    .map((presentation) => renderSection(spec, presentation, showIndex, mediaByNeed))
+    .join('');
 
   return [
     '<!doctype html>',
@@ -342,7 +380,7 @@ export function composeDocument(spec: PageSpec, plan: CreativePresentationPlan, 
     identity ? `<span class="identity">${escapeHtml(identity)}</span>` : '',
     '</div></header>',
     '<main id="content">',
-    renderHero(spec, plan).replace('<h1>', '<h1 id="page-headline">'),
+    renderHero(spec, plan, mediaByNeed).replace('<h1>', '<h1 id="page-headline">'),
     sections,
     renderDisclosure(spec, 'inline'),
     renderClosing(spec, plan),

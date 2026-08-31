@@ -78,6 +78,14 @@ export interface SectionPresentation {
 
   /** Promoted by `emphasis: 'lead'`; renders at larger scale. */
   promoted: boolean;
+
+  /**
+   * Generated imagery assigned to this section, by AssetNeed id.
+   *
+   * A reference, not a URL: the plan stays free of media locations, and the
+   * composer resolves it against the run's generated assets.
+   */
+  generatedAssetNeedId: string | null;
 }
 
 export interface HeroPresentation {
@@ -87,6 +95,9 @@ export interface HeroPresentation {
 
   /** Index of the section whose asset the hero borrowed, when it took one. */
   mediaSourceIndex: number | null;
+
+  /** Generated hero imagery, by AssetNeed id. */
+  generatedAssetNeedId: string | null;
 }
 
 export interface ClosingPresentation {

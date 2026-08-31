@@ -4,6 +4,7 @@ import {
   getDirection,
   planPresentation,
   type CreativePresentationPlan,
+  type GeneratedMedia,
   type PlanOptions,
 } from './creative';
 import type { ProjectManifest } from './runtime';
@@ -13,7 +14,15 @@ export const PAGESPEC_COMPILER_VERSION = 'ithinq-pagespec-renderer/0.2.0';
 export const PAGESPEC_CONTRACT_SOURCE =
   'globalvoice1444/ithinq-partner-network@51c103ff2492b068095dc356225d5d9ef496b44b';
 
-export interface CompilePageSpecOptions extends PageSpecValidationOptions, PlanOptions {}
+export interface CompilePageSpecOptions extends PageSpecValidationOptions, PlanOptions {
+  /**
+   * Renderer-local generated imagery.
+   *
+   * Kept out of the PageSpec entirely: the contract carries business truth,
+   * and generated creative is the renderer's own material.
+   */
+  generatedMedia?: readonly GeneratedMedia[];
+}
 
 export interface CompilePageSpecResult {
   manifest: ProjectManifest;
@@ -54,7 +63,11 @@ export function compilePageSpecToProjectManifest(
   options?: CompilePageSpecOptions,
 ): CompilePageSpecResult {
   const { spec, validation } = requireValidPageSpec(input, options);
-  const plan = planPresentation(spec as PageSpec, validation.skipSections, options);
+  const generatedMedia = options?.generatedMedia ?? [];
+  const plan = planPresentation(spec as PageSpec, validation.skipSections, {
+    ...options,
+    generatedAssetNeedIds: options?.generatedAssetNeedIds ?? generatedMedia.map((item) => item.assetNeedId),
+  });
   const direction = getDirection(plan.directionId);
 
   const metadata = {
@@ -70,7 +83,7 @@ export function compilePageSpecToProjectManifest(
     manifestVersion: 1,
     entry: '/index.html',
     files: {
-      '/index.html': composeDocument(spec, plan, direction),
+      '/index.html': composeDocument(spec, plan, direction, generatedMedia),
       '/pagespec.json': canonicalJson(spec),
       '/presentation.json': canonicalJson(plan),
       '/renderer.json': canonicalJson(metadata),
