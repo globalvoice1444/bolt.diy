@@ -28,10 +28,14 @@ Snapshot hashes:
 | --- | --- |
 | `page-spec.schema.json` | `3a88079cc7cfc9ec62805439d6616b0560da43148de41501f38d76949a1eddb3` |
 | `page-spec.example.json` | `d4a8ca6f1370b8a4c38ea6ec05d92e641a64d39f41cef36be5f4bc1c95ec6874` |
-| `page-spec.ts` | `f6129d3c96183fbc472b24d50cc55950704b8d3eccb4a0aeda2db4183f6405d0` |
+| `page-spec.ts` | `5a928aac315b5799dc4eb3da3aa14b6d9a9619a96b0cf92b3094fa2ec78df9f5` |
 | `README.md` | `2f6f50b1eec7cd972b3cbfe9392f4104ce352540a6da1bc1c7fe5d3afffa6e7b` |
 
-Do not edit these files to satisfy the renderer. Replace the snapshot from a reviewed Growth Engine contract release.
+All four files are **byte-identical** to that commit, verified by `contract-provenance.spec.ts`, which hashes them on every test run.
+
+The snapshot is an **opaque vendored artifact**, not renderer source. `contracts/` is excluded from Prettier and ESLint so no tool can quietly reformat it — an earlier copy of `page-spec.ts` had been rewritten into the renderer's house style (semicolons, collapsed arrays, dropped trailing commas), which changed no semantics but broke byte-level provenance. The exact bytes have been restored and the digests above recomputed from the pinned source.
+
+Do not edit these files to satisfy the renderer. Replacing the snapshot is a deliberate act: take a reviewed Growth Engine contract release, copy the bytes, and update the pinned commit and the digests together.
 
 ## Local routes
 
@@ -146,7 +150,7 @@ The renderer may never fabricate:
 
 The renderer should eventually be capable of producing pages that look materially different from one another, rather than merely filling a fixed template. The ownership boundary is what stays fixed: the Growth Engine owns business truth, the renderer owns presentation. Widening presentational freedom does not widen the renderer's authority over truth.
 
-None of that future system is built in this POC, and this commit does not begin it.
+Phase 1 of that direction is now implemented on `ithinq/creative-renderer-productization`: a presentation plan and four interchangeable creative directions built on this same seam. See [`ITHINQ-CREATIVE-RENDERER.md`](./ITHINQ-CREATIVE-RENDERER.md). The truth boundary described above is unchanged by it.
 
 ## Explicitly out of scope
 

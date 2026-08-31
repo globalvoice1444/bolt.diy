@@ -34,9 +34,9 @@
  * by optimistically accepting it. Deterministic refusal beats hopeful
  * acceptance.
  */
-export type SpecVersion = '1.0';
+export type SpecVersion = '1.0'
 
-export const SUPPORTED_VERSION: SpecVersion = '1.0';
+export const SUPPORTED_VERSION: SpecVersion = '1.0'
 
 /**
  * The canonical V1 vocabulary: exactly the section kinds
@@ -47,9 +47,17 @@ export const SUPPORTED_VERSION: SpecVersion = '1.0';
  * `page.subheadline`; the ask is `ctas.primary`. Where you draw them is
  * yours to decide.
  */
-export const SECTION_KINDS = ['interrupt', 'scenario', 'pain', 'mechanism', 'vertical_fit', 'faq', 'risk'] as const;
+export const SECTION_KINDS = [
+  'interrupt',
+  'scenario',
+  'pain',
+  'mechanism',
+  'vertical_fit',
+  'faq',
+  'risk',
+] as const
 
-export type SectionKind = (typeof SECTION_KINDS)[number];
+export type SectionKind = (typeof SECTION_KINDS)[number]
 
 /**
  * Why the section is on the page, held separately from how it looks.
@@ -65,9 +73,9 @@ export const SECTION_PURPOSES = [
   'handle_objection',
   'reduce_risk',
   'drive_action',
-] as const;
+] as const
 
-export type SectionPurpose = (typeof SECTION_PURPOSES)[number];
+export type SectionPurpose = (typeof SECTION_PURPOSES)[number]
 
 /**
  * The purposes that assert something about the product.
@@ -82,47 +90,53 @@ export const ASSERTING_PURPOSES = [
   'handle_objection',
   'reduce_risk',
   'drive_action',
-] as const;
+] as const
 
-export type AssertingPurpose = (typeof ASSERTING_PURPOSES)[number];
+export type AssertingPurpose = (typeof ASSERTING_PURPOSES)[number]
 
-export const AWARENESS_LEVELS = ['unaware', 'problem-aware', 'solution-aware', 'product-aware', 'most-aware'] as const;
+export const AWARENESS_LEVELS = [
+  'unaware',
+  'problem-aware',
+  'solution-aware',
+  'product-aware',
+  'most-aware',
+] as const
 
-export type AwarenessLevel = (typeof AWARENESS_LEVELS)[number];
+export type AwarenessLevel = (typeof AWARENESS_LEVELS)[number]
 
 /** Content hierarchy, which the Growth Engine owns. How it is expressed is yours. */
-export const EMPHASIS = ['lead', 'support', 'aside'] as const;
+export const EMPHASIS = ['lead', 'support', 'aside'] as const
 
-export type Emphasis = (typeof EMPHASIS)[number];
+export type Emphasis = (typeof EMPHASIS)[number]
 
 /** Every fact reference must match this. Truncated forms are invalid. */
-export const FACT_REFERENCE_PATTERN = /^f_[0-9a-f]{64}$/;
+export const FACT_REFERENCE_PATTERN = /^f_[0-9a-f]{64}$/
 
 export interface Cta {
-  label: string;
+  label: string
   /**
    * Fully resolved, attribution already attached. Render exactly.
    * Never append, rewrite, shorten, proxy or re-sign it.
    */
-  url: string;
-  role: 'primary' | 'secondary';
+  url: string
+  role: 'primary' | 'secondary'
   /** Stripping or altering this URL destroys the Partner's commission. */
-  carriesAttribution?: boolean;
+  carriesAttribution?: boolean
 }
 
 /** A reference, never storage. No credentials, no provider metadata, no paths. */
 export interface Asset {
-  url: string;
-  kind: 'image' | 'logo' | 'illustration';
-  alt: string;
-  role?: string | null;
+  url: string
+  kind: 'image' | 'logo' | 'illustration'
+  alt: string
+  role?: string | null
   /** A required asset that will not load is fatal; an optional one is omitted. */
-  required?: boolean;
+  required?: boolean
 }
 
 export interface QaItem {
-  question: string;
-  answer: string;
+  question: string
+  answer: string
 }
 
 /**
@@ -136,23 +150,23 @@ export interface QaItem {
  */
 export interface Provenance {
   /** `f_` + a full lowercase SHA-256 digest. Never a database id. */
-  factRefs: string[];
+  factRefs: string[]
 }
 
 export interface PageSpecSection {
-  kind: SectionKind | (string & {});
-  purpose: SectionPurpose;
-  provenance: Provenance;
+  kind: SectionKind | (string & {})
+  purpose: SectionPurpose
+  provenance: Provenance
   /** When true, an unrecognised `kind` is fatal instead of skippable. */
-  required?: boolean;
+  required?: boolean
   /** Required on a generated document. */
-  emphasis?: Emphasis;
-  eyebrow?: string | null;
-  heading?: string | null;
-  body?: string | null;
-  items?: string[];
-  qa?: QaItem[];
-  asset?: Asset;
+  emphasis?: Emphasis
+  eyebrow?: string | null
+  heading?: string | null
+  body?: string | null
+  items?: string[]
+  qa?: QaItem[]
+  asset?: Asset
 }
 
 /**
@@ -164,29 +178,29 @@ export interface PageSpecSection {
  * inference, strategy values are null and provenance is an honest empty
  * array. Never treat a legacy inference as authored strategy.
  */
-export type PageOrigin = 'generated' | 'legacy';
+export type PageOrigin = 'generated' | 'legacy'
 
 interface PageSpecPageBase {
   /** Identifies the page, not the Partner. Never a database id. */
-  reference: string;
-  origin: PageOrigin;
+  reference: string
+  origin: PageOrigin
   /** Diagnostic only. Do not branch on it. */
-  templateKey?: string | null;
-  name: string;
-  audience: string;
+  templateKey?: string | null
+  name: string
+  audience: string
   /** The hook. There is no hero section; this is where it lives. */
-  headline: string;
-  subheadline: string;
+  headline: string
+  subheadline: string
   /** Null is legitimate even when generated: the flagship brief is not market-scoped. */
-  vertical: string | null;
+  vertical: string | null
 }
 
 export interface GeneratedPage extends PageSpecPageBase {
-  origin: 'generated';
-  campaign: string;
-  situation: string;
-  awareness: AwarenessLevel;
-  sophistication: number;
+  origin: 'generated'
+  campaign: string
+  situation: string
+  awareness: AwarenessLevel
+  sophistication: number
 }
 
 /**
@@ -204,14 +218,14 @@ export interface GeneratedPage extends PageSpecPageBase {
  * itself rather than derived from a brief.
  */
 export interface LegacyPage extends PageSpecPageBase {
-  origin: 'legacy';
-  campaign: null;
-  situation: null;
-  awareness: null;
-  sophistication: null;
+  origin: 'legacy'
+  campaign: null
+  situation: null
+  awareness: null
+  sophistication: null
 }
 
-export type PageSpecPage = GeneratedPage | LegacyPage;
+export type PageSpecPage = GeneratedPage | LegacyPage
 
 /**
  * Display-safe Partner identity, already resolved.
@@ -224,14 +238,14 @@ export interface PageSpecPartner {
    * Null means no name is safe to show. Render without a personal
    * introduction — never substitute an identifier.
    */
-  displayName: string | null;
-  businessName?: string | null;
-  introduction?: string | null;
+  displayName: string | null
+  businessName?: string | null
+  introduction?: string | null
 }
 
 export interface PageSpecDisclosure {
-  text: string;
-  placement?: 'footer' | 'header' | 'inline';
+  text: string
+  placement?: 'footer' | 'header' | 'inline'
 }
 
 /**
@@ -243,40 +257,40 @@ export interface PageSpecDisclosure {
  * renderer-controlled ceiling. See README, URL trust model.
  */
 export interface PageSpecPolicy {
-  allowedLinkHosts: string[];
+  allowedLinkHosts: string[]
 }
 
 export interface PageSpec {
-  specVersion: SpecVersion;
-  page: PageSpecPage;
-  partner: PageSpecPartner;
-  ctas: { primary: Cta; secondary?: Cta | null };
-  disclosure: PageSpecDisclosure;
-  policy: PageSpecPolicy;
+  specVersion: SpecVersion
+  page: PageSpecPage
+  partner: PageSpecPartner
+  ctas: { primary: Cta; secondary?: Cta | null }
+  disclosure: PageSpecDisclosure
+  policy: PageSpecPolicy
   /** Rendered in array order. Never reorder, merge or split. */
-  sections: PageSpecSection[];
+  sections: PageSpecSection[]
 }
 
 /* ------------------------------------------------------------------ */
 /* Validation outcomes                                                 */
 /* ------------------------------------------------------------------ */
 
-export type FailureSeverity = 'fatal' | 'degradable';
+export type FailureSeverity = 'fatal' | 'degradable'
 
 export interface ValidationFinding {
-  severity: FailureSeverity;
-  code: string;
-  detail: string;
+  severity: FailureSeverity
+  code: string
+  detail: string
   /** Index into `sections` when the finding belongs to one. */
-  sectionIndex?: number;
+  sectionIndex?: number
 }
 
 export interface ValidationResult {
   /** False means refuse to render. Never render a partially valid page. */
-  renderable: boolean;
-  findings: ValidationFinding[];
+  renderable: boolean
+  findings: ValidationFinding[]
   /** Section indices to skip. Present only when `renderable` is true. */
-  skipSections: number[];
+  skipSections: number[]
 }
 
 /**
@@ -286,13 +300,13 @@ export interface ValidationResult {
  * against a strict schema is optimism, not compatibility.
  */
 export function supportsVersion(specVersion: string): boolean {
-  return specVersion === SUPPORTED_VERSION;
+  return specVersion === SUPPORTED_VERSION
 }
 
 export function isKnownKind(kind: string): kind is SectionKind {
-  return (SECTION_KINDS as readonly string[]).includes(kind);
+  return (SECTION_KINDS as readonly string[]).includes(kind)
 }
 
 export function isAssertingPurpose(purpose: string): purpose is AssertingPurpose {
-  return (ASSERTING_PURPOSES as readonly string[]).includes(purpose);
+  return (ASSERTING_PURPOSES as readonly string[]).includes(purpose)
 }

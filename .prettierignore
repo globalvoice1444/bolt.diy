@@ -1,2 +1,6 @@
 pnpm-lock.yaml
 .astro
+# Vendored PageSpec contract snapshot.
+# Copied byte-for-byte from ithinq-partner-network and pinned by commit SHA.
+# It is an opaque artifact: reformatting it breaks provenance verification.
+contracts/page-spec/v1/

@@ -4,7 +4,8 @@ import { getNamingConventionRule, tsFileExtensions } from '@blitz/eslint-plugin/
 
 export default [
   {
-    ignores: ['**/dist', '**/node_modules', '**/.wrangler', '**/bolt/build', '**/.history'],
+    /* `contracts/` holds the vendored PageSpec snapshot; it must stay byte-identical to its pinned source. */
+    ignores: ['**/dist', '**/node_modules', '**/.wrangler', '**/bolt/build', '**/.history', 'contracts'],
   },
   ...blitzPlugin.configs.recommended(),
   {
