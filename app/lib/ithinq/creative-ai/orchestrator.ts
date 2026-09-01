@@ -1,6 +1,7 @@
 import { createHash } from 'node:crypto';
 import type { PageSpec } from '@ithinq-pagespec/page-spec';
-import { assetIdFor, devAssetStore, type AssetStore } from './asset-store';
+import { assetIdFor, type AssetStore } from './asset-store';
+import { resolveAssetStore } from './asset-store-resolve';
 import { planAssetNeeds, type AssetNeed } from './asset-need';
 import { buildImagePrompt } from './prompt';
 import { normaliseCreativeRequest, type CreativeRequest, type CreativeRequestInput } from './request';
@@ -76,7 +77,7 @@ export async function orchestrateCreative(
   const needs = planAssetNeeds(spec, strategy);
 
   const generator = options.generator ?? resolveGenerator(options.env);
-  const store = options.store ?? devAssetStore;
+  const store = options.store ?? resolveAssetStore(options.env);
   const assets: GeneratedAsset[] = [];
   const failures: AssetFailure[] = [];
 

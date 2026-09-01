@@ -1,6 +1,7 @@
 import type { PageSpec } from '@ithinq-pagespec/page-spec';
 import type { CopyText } from '~/lib/ithinq/pagespec/creative';
-import { assetIdFor, devAssetStore, type AssetStore } from './asset-store';
+import { assetIdFor, type AssetStore } from './asset-store';
+import { resolveAssetStore } from './asset-store-resolve';
 import { planAssetNeeds, type AssetNeed } from './asset-need';
 import { authorCampaignCopy, type CopyResult } from './copy';
 import { factCoverage, EMPTY_FACT_SET, type ApprovedFactSet, type FactCoverage } from './facts';
@@ -98,7 +99,7 @@ export async function runCampaign(
   const env = options.env ?? {};
   const textGenerator = options.textGenerator === undefined ? resolveTextGenerator(env) : options.textGenerator;
   const imageGenerator = options.imageGenerator ?? resolveGenerator(env);
-  const store = options.store ?? devAssetStore;
+  const store = options.store ?? resolveAssetStore(env);
   const factSet = options.factSet ?? (await options.factSource?.load()) ?? EMPTY_FACT_SET;
   const failures: CampaignFailure[] = [];
 

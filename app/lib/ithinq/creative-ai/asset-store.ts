@@ -11,15 +11,37 @@ import { join, resolve } from 'node:path';
  * writes to disk rather than holding bytes in memory — an in-memory map would
  * make the delivery route dead architecture the moment the server reloaded.
  *
- * PRODUCTION SEAM: a deployment replaces `FileSystemAssetStore` with an
- * object-store implementation (R2, S3 or equivalent) behind this same
- * interface. Nothing above this file knows where bytes are kept. Choosing that
- * store is a deployment decision and is deliberately not made here.
+ * PRODUCTION SEAM, now filled: `S3AssetStore` is the durable implementation
+ * and `resolveAssetStore` (in `asset-store-resolve.ts`) chooses between them
+ * from the server environment. Nothing above that file knows where bytes are
+ * kept — `urlFor` returns a renderer path either way, so generated media is
+ * always delivered from our own origin whatever holds the bytes.
  */
 export interface StoredAsset {
   id: string;
   mimeType: string;
   bytes: Uint8Array;
+}
+
+/** A storage fault, distinct from a generation fault. */
+export class AssetStoreError extends Error {
+  constructor(
+    message: string,
+    readonly code: string,
+  ) {
+    super(message);
+    this.name = 'AssetStoreError';
+  }
+}
+
+/**
+ * Ids are content-addressed hex digests and nothing else.
+ *
+ * Every backend checks this before an id reaches a path or an object key, so
+ * traversal and key injection are refused identically wherever bytes live.
+ */
+export function isAssetId(id: string): boolean {
+  return /^[0-9a-f]{8,64}$/.test(id);
 }
 
 export interface AssetStore {
@@ -57,6 +79,10 @@ export class FileSystemAssetStore implements AssetStore {
   }
 
   async put(id: string, mimeType: string, bytes: Uint8Array): Promise<void> {
+    if (!isAssetId(id)) {
+      throw new AssetStoreError('Refusing to store an asset under a non-content-addressed id.', 'invalid_id');
+    }
+
     const extension = EXTENSIONS[mimeType] ?? 'bin';
     await mkdir(this._root, { recursive: true });
     await writeFile(this._pathFor(id, extension), bytes);
@@ -64,7 +90,7 @@ export class FileSystemAssetStore implements AssetStore {
 
   async get(id: string): Promise<StoredAsset | null> {
     // Ids are hex digests; anything else cannot address a file here.
-    if (!/^[0-9a-f]{8,64}$/.test(id)) {
+    if (!isAssetId(id)) {
       return null;
     }
 
