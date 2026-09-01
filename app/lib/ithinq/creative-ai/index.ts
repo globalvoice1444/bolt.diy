@@ -36,7 +36,25 @@ export {
 } from './website';
 export { guardCopy, guardFactRefs, safeCopy, supportContext } from './copy-guard';
 export { OpenAITextGenerator, OPENAI_TEXT_MODEL, resolveTextGenerator } from './provider/openai-text';
-export { assetIdFor, devAssetStore, FileSystemAssetStore } from './asset-store';
+export { assetIdFor, devAssetStore, isAssetId, AssetStoreError, FileSystemAssetStore } from './asset-store';
+export { resolveAssetStore } from './asset-store-resolve';
+export { S3AssetStore } from './s3-asset-store';
+export {
+  CampaignJobQueue,
+  CampaignJobRejected,
+  campaignJobId,
+  isCampaignJobId,
+  normaliseJobInput,
+  MAX_BRIEF_LENGTH,
+} from './jobs';
+export {
+  campaignJobs,
+  campaignJobView,
+  campaignQueueStats,
+  campaignRunSummary,
+  resetCampaignJobs,
+  submitCampaignJob,
+} from './campaign-jobs';
 export { OpenAIImageGenerator, OPENAI_IMAGE_MODEL } from './provider/openai';
 export { PlaceholderImageGenerator } from './provider/placeholder';
 export { AssetGenerationError } from './provider/types';
@@ -45,6 +63,16 @@ export type { CreativeStrategy, ImageStrategy, VisualMood } from './strategy';
 export type { AssetNeed, AssetRole, AspectRatio, PlacementIntent } from './asset-need';
 export type { CreativeAssetGenerator, GeneratedAsset, GenerateImageRequest } from './provider/types';
 export type { AssetStore, StoredAsset } from './asset-store';
+export type { S3AssetStoreOptions } from './s3-asset-store';
+export type {
+  CampaignJobFailure,
+  CampaignJobInput,
+  CampaignJobRecord,
+  CampaignJobStatus,
+  CampaignJobQueueOptions,
+  QueueStats,
+} from './jobs';
+export type { CampaignJobResult, CampaignJobView, CampaignRunSummary } from './campaign-jobs';
 export type { CreativeRun, AssetFailure, OrchestrateOptions } from './orchestrator';
 export type { CampaignRun, CampaignOptions, CampaignFailure } from './campaign';
 export type { InterpretedRequest } from './interpret';

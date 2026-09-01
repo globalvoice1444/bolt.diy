@@ -44,11 +44,65 @@ services:
       # Optional. Overrides the approved page list for fact ingestion.
       # - key: ITHINQ_WEBSITE_PATHS
       #   sync: false
+      #
+      # DURABLE ASSET STORAGE. Pick exactly one of the two options below.
+      #
+      # Option A - object store (S3, R2, B2, MinIO). Survives a redeploy AND a
+      # second instance, so it is the one that does not have to be revisited.
+      # All four are required together: `resolveAssetStore` refuses a partial
+      # configuration rather than silently falling back to ephemeral disk,
+      # because the symptom of that fallback is imagery vanishing on deploy.
+      # - key: RENDERER_ASSET_S3_ENDPOINT
+      #   sync: false
+      # - key: RENDERER_ASSET_S3_BUCKET
+      #   sync: false
+      # - key: RENDERER_ASSET_S3_ACCESS_KEY_ID
+      #   sync: false
+      # - key: RENDERER_ASSET_S3_SECRET_ACCESS_KEY
+      #   sync: false
+      # Optional. `auto` for R2 and MinIO; a real region for S3.
+      # - key: RENDERER_ASSET_S3_REGION
+      #   value: auto
+      # - key: RENDERER_ASSET_S3_PREFIX
+      #   value: ithinq-generated/
+      #
+      # Option B - a Render persistent disk. Simpler, but it pins the service to
+      # one instance forever. Uncomment the `disk:` block below and point this
+      # at the same mount; no code path changes, FileSystemAssetStore is already
+      # durable once it is writing to a disk that persists.
+      # - key: RENDERER_ASSET_DIR
+      #   value: /var/ithinq-data/generated
+      #
+      # Campaign job queue. Defaults are 2 / 8 / 300000 / 1800000. Concurrency
+      # is a spend and rate-limit bound before it is a CPU one: each job is a
+      # gpt-4o interpretation, an authoring pass, a claim audit and up to two
+      # gpt-image-1 renders.
+      # - key: RENDERER_CAMPAIGN_CONCURRENCY
+      #   value: '2'
+      # - key: RENDERER_CAMPAIGN_QUEUE_LIMIT
+      #   value: '8'
+      # - key: RENDERER_CAMPAIGN_TIMEOUT_MS
+      #   value: '300000'
+      # - key: RENDERER_CAMPAIGN_RESULT_TTL_MS
+      #   value: '1800000'
+    # Option B, second half. A disk makes `.data/` survive a redeploy but binds
+    # the service to a single instance; the object store above does not.
+    # disk:
+    #   name: ithinq-data
+    #   mountPath: /var/ithinq-data
+    #   sizeGB: 5
 #
-# No persistent disk is declared. Generated imagery and the website fact
-# snapshot live under `.data/` on the instance filesystem and do not survive a
-# redeploy: imagery regenerates on the next request and the snapshot is rebuilt
-# with `pnpm ithinq:refresh-facts`. That is acceptable for smoke testing and
-# is NOT acceptable once Partner-facing campaign pages must keep the same
-# imagery across deploys — add a disk mounted at /opt/render/project/src/.data,
-# or an object store behind the existing AssetStore interface, before then.
+# STORAGE, as deployed today: no disk and no object store are configured, so
+# generated imagery and the website fact snapshot live under `.data/` on the
+# instance filesystem and do not survive a redeploy. Imagery regenerates on the
+# next request (at real gpt-image-1 cost) and the snapshot is rebuilt with
+# `pnpm ithinq:refresh-facts`. Acceptable for smoke testing; NOT acceptable for
+# Partner-facing pages, which must keep the same imagery across deploys. The
+# code no longer blocks that — set Option A or Option B above and redeploy.
+#
+# CAMPAIGN JOBS: authoring runs off the request thread. `POST
+# /ithinq/campaign-jobs` returns a job id immediately, `GET
+# /ithinq/campaign-jobs/:id` reports progress, and
+# `/ithinq/campaign-preview?job=<id>` renders the finished page. Job records
+# live in the process, which is complete for one web service and would need a
+# shared record store before a second instance.
