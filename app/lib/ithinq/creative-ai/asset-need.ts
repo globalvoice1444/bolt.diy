@@ -1,3 +1,4 @@
+import type { OverlayText } from './overlay';
 import type { PageSpec } from '@ithinq-pagespec/page-spec';
 import { getDirection } from '~/lib/ithinq/pagespec/creative';
 import type { CreativeStrategy } from './strategy';
@@ -20,6 +21,30 @@ export type PlacementIntent = 'split-hero' | 'full-bleed' | 'section-inset' | 'e
 export interface AssetNeed {
   id: string;
   role: AssetRole;
+
+  /**
+   * Words the caller has approved and wants rendered ON the image.
+   *
+   * Absent for every page-authored need, and absent by default for an
+   * external caller too — a photograph with no lettering is a complete and
+   * often better advertisement. Its PRESENCE is the only thing that switches
+   * the prompt builder from photographic discipline to designed advertising,
+   * so there is no mode flag to keep in step with reality.
+   */
+  overlay?: OverlayText;
+
+  /**
+   * The caller's own art direction, in prose.
+   *
+   * Prose on purpose. Fields cage creativity — a schema with a `layout` enum
+   * would hand every caller the same handful of advertisements. A creative
+   * director writes a paragraph, so this carries a paragraph, and the renderer
+   * reads it as direction rather than as configuration.
+   */
+  creativeDirection?: string;
+
+  /** The caller's own short label for the concept. Prompt context only. */
+  creativeType?: string;
 
   /** What should be depicted, as creative direction rather than as a claim. */
   subject: string;
