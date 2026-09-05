@@ -8,6 +8,9 @@ import {
   VisualRequestError,
 } from './visual-service';
 import { PlaceholderImageGenerator } from './provider/placeholder';
+import { buildImagePrompt } from './prompt';
+import { noOverlayVerifier } from './overlay-verify';
+import type { CreativeStrategy } from './strategy';
 import { isAssetId, type AssetStore } from './asset-store';
 
 function memoryStore() {
@@ -26,6 +29,20 @@ function memoryStore() {
 
   return { written, store };
 }
+
+const STRATEGY: CreativeStrategy = {
+  strategyVersion: 1,
+  objective: 'test',
+  narrativeAngle: 'situation-first',
+  visualMood: 'refined',
+  directionId: 'editorial-luxe',
+  copyStyle: 'editorial',
+  imageStrategy: 'supporting',
+  pageDensity: 'comfortable',
+  ctaIntensity: 'balanced',
+  emphasisSectionIndices: [],
+  rationale: [],
+};
 
 const headers = (value?: string) => ({ headers: new Headers(value ? { authorization: value } : {}) });
 
@@ -174,5 +191,214 @@ describe('the visual path carries the caller brief and nothing of ours', () => {
     expect(generated).toBe(1);
     expect(second.assets[0]!.id).toBe(first.assets[0]!.id);
     expect(written.size).toBe(1);
+  });
+});
+
+/*
+ * Designed advertising (ad-creative contract).
+ *
+ * The property under test throughout: supplying approved words switches this
+ * service from photographic discipline to designed advertising, and supplying
+ * none leaves the previous behaviour untouched to the character.
+ */
+describe('the ad-creative contract', () => {
+  const overlay = {
+    headline: 'Your next patient just hung up',
+    offer: 'First month free',
+    brand: 'Bright Smile Dental',
+  };
+
+  it('leaves the photographic path byte-identical when no words are supplied', () => {
+    const need = visualNeedFor(normaliseVisualRequest({ direction: 'an empty reception desk at 12:40' }), 0);
+    const prompt = buildImagePrompt(need, STRATEGY);
+
+    // The truth control that predates this feature, still intact.
+    expect(prompt).toContain('commercial photograph');
+    expect(prompt).toContain('deliberately blank and unbranded');
+    expect(prompt).toContain('no text');
+    expect(prompt).toContain('no lettering');
+    expect(need.overlay).toBeUndefined();
+  });
+
+  it('renders approved words and forbids every other word', () => {
+    const need = visualNeedFor(
+      normaliseVisualRequest({
+        direction: 'an empty reception desk at 12:40',
+        overlay,
+        creativeType: 'offer_led',
+        creativeDirection: 'Bold poster energy. The offer dominates. Photography reduced to texture behind the type.',
+      }),
+      0,
+    );
+    const prompt = buildImagePrompt(need, STRATEGY);
+
+    // Each approved string reaches the renderer verbatim.
+    expect(prompt).toContain('Your next patient just hung up');
+    expect(prompt).toContain('First month free');
+    expect(prompt).toContain('Bright Smile Dental');
+
+    // The blanket suppression lifts...
+    expect(prompt).not.toContain('deliberately blank and unbranded');
+    expect(prompt).toContain('designed advertisement');
+
+    // ...but inventing words, prices or percentages does not become allowed.
+    expect(prompt).toContain('Do not add ANY other text');
+    expect(prompt).toContain('prices');
+    expect(prompt).toContain('percentages');
+
+    // The caller's prose steers the design; no layout is prescribed.
+    expect(prompt).toContain('Bold poster energy');
+    expect(prompt).toContain('yours to decide');
+  });
+
+  it('bounds each overlay field without policing its tone', () => {
+    // Aggressive, shouty, punctuation-heavy copy is entirely acceptable.
+    expect(() =>
+      normaliseVisualRequest({
+        direction: 'd',
+        overlay: { headline: 'YOUR NEXT $5,000 PATIENT JUST HUNG UP!!!' },
+      }),
+    ).not.toThrow();
+
+    expect(() => normaliseVisualRequest({ direction: 'd', overlay: { cta: 'x'.repeat(61) } })).toThrow(
+      VisualRequestError,
+    );
+
+    expect(() => normaliseVisualRequest({ direction: 'd', overlay: 'nope' })).toThrow(VisualRequestError);
+  });
+
+  it('treats an overlay of only empty strings as no overlay at all', () => {
+    const request = normaliseVisualRequest({ direction: 'd', overlay: { headline: '   ' } });
+
+    expect(request.overlay).toBeUndefined();
+    expect(request.groundedFields).toEqual([]);
+  });
+
+  it('accepts snake_case for the new fields too', () => {
+    const request = normaliseVisualRequest({
+      direction: 'd',
+      overlay,
+      grounded_fields: ['offer'],
+      creative_type: 'premium',
+      creative_direction: 'Luxury editorial.',
+    });
+
+    expect(request.groundedFields).toEqual(['offer']);
+    expect(request.creativeType).toBe('premium');
+    expect(request.creativeDirection).toBe('Luxury editorial.');
+  });
+
+  it('refuses a grounded field that is not an overlay field', () => {
+    expect(() => normaliseVisualRequest({ direction: 'd', overlay, groundedFields: ['referral_url'] })).toThrow(
+      VisualRequestError,
+    );
+  });
+
+  it('drops a grounded field the overlay does not carry, rather than refusing', () => {
+    const request = normaliseVisualRequest({
+      direction: 'd',
+      overlay: { headline: 'Only a headline' },
+      groundedFields: ['offer'],
+    });
+
+    expect(request.groundedFields).toEqual([]);
+  });
+
+  it('never verifies when nothing is marked grounded', async () => {
+    const { store } = memoryStore();
+    let calls = 0;
+    const verifier = {
+      available: true,
+      async verify() {
+        calls += 1;
+
+        return { checked: [], mismatched: [], skipped: false };
+      },
+    };
+
+    const result = await renderVisuals(normaliseVisualRequest({ direction: 'a desk', overlay }), {
+      generator: new PlaceholderImageGenerator(),
+      store,
+      verifier,
+    });
+
+    // No grounded fact, no vision call, no cost.
+    expect(calls).toBe(0);
+    expect(result.assets[0].verification).toBeUndefined();
+  });
+
+  it('reads a grounded string back and reports it when it survives', async () => {
+    const { store } = memoryStore();
+    const verifier = {
+      available: true,
+      async verify() {
+        return { checked: ['offer' as const], mismatched: [], skipped: false };
+      },
+    };
+
+    const result = await renderVisuals(
+      normaliseVisualRequest({ direction: 'a desk', overlay, groundedFields: ['offer'] }),
+      { generator: new PlaceholderImageGenerator(), store, verifier },
+    );
+
+    expect(result.assets[0].verification).toEqual({ checked: ['offer'], mismatched: [], skipped: false });
+  });
+
+  it('makes one corrective attempt when a grounded string is corrupted, and reports the outcome', async () => {
+    const { store } = memoryStore();
+    let attempt = 0;
+    const verifier = {
+      available: true,
+      async verify() {
+        attempt += 1;
+
+        return attempt === 1
+          ? { checked: ['offer' as const], mismatched: ['offer' as const], skipped: false }
+          : { checked: ['offer' as const], mismatched: [], skipped: false };
+      },
+    };
+
+    const result = await renderVisuals(
+      normaliseVisualRequest({ direction: 'a desk', overlay, groundedFields: ['offer'] }),
+      { generator: new PlaceholderImageGenerator(), store, verifier },
+    );
+
+    expect(attempt).toBe(2);
+    expect(result.assets[0].verification?.mismatched).toEqual([]);
+  });
+
+  it('returns the creative with an honest warning rather than silently altering it', async () => {
+    const { store } = memoryStore();
+    let attempt = 0;
+    const verifier = {
+      available: true,
+      async verify() {
+        attempt += 1;
+
+        return { checked: ['offer' as const], mismatched: ['offer' as const], skipped: false };
+      },
+    };
+
+    const result = await renderVisuals(
+      normaliseVisualRequest({ direction: 'a desk', overlay, groundedFields: ['offer'] }),
+      { generator: new PlaceholderImageGenerator(), store, verifier },
+    );
+
+    // Two attempts, then the truth: an asset, and what is still wrong with it.
+    expect(attempt).toBe(2);
+    expect(result.assets).toHaveLength(1);
+    expect(result.assets[0].verification?.mismatched).toEqual(['offer']);
+  });
+
+  it('never lets an unavailable verifier fail a render the caller has paid for', async () => {
+    const { store } = memoryStore();
+
+    const result = await renderVisuals(
+      normaliseVisualRequest({ direction: 'a desk', overlay, groundedFields: ['offer'] }),
+      { generator: new PlaceholderImageGenerator(), store, verifier: noOverlayVerifier },
+    );
+
+    expect(result.assets).toHaveLength(1);
+    expect(result.assets[0].verification?.skipped).toBe(true);
   });
 });
