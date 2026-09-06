@@ -5,7 +5,7 @@ import { compilePageSpecToProjectManifest, isDirectionId, listDirections } from 
 
 export const meta: MetaFunction = () => [
   { title: 'iThinq creative renderer workbench' },
-  { name: 'description', content: 'PageSpec 1.0 rendered under interchangeable creative directions' },
+  { name: 'description', content: 'PageSpec 1.1 rendered under interchangeable creative directions' },
 ];
 
 export function loader({ request }: LoaderFunctionArgs) {

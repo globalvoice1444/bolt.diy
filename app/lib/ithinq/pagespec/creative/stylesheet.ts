@@ -211,6 +211,20 @@ a{color:inherit}
 [data-ground='dark'] .chapter-rule{border-color:var(--veil-line)}
 [data-ground='dark'] .pull-quote{border-color:var(--accent-on-dark);color:var(--inverse-ink)}
 [data-ground='dark'] .button--primary{background:var(--accent-on-dark);color:var(--inverse)}
+[data-ground='dark'] .faq summary::after{border-color:var(--veil-line)}
+[data-ground='dark'] .faq summary:hover,[data-ground='dark'] .faq details[open] summary{color:var(--accent-on-dark)}
+[data-ground='dark'] .faq summary:hover::after{background:var(--veil);border-color:var(--accent-on-dark)}
+[data-ground='dark'] .faq details[open] summary::after{background:var(--accent-on-dark);color:var(--inverse);
+  border-color:transparent}
+[data-ground='dark'] .proof__quote,[data-ground='dark'] .proof__attribution{color:var(--inverse-ink)}
+[data-ground='dark'] .proof__source{color:var(--inverse-muted)}
+[data-ground='dark'] .proof__stars,[data-ground='dark'] .proof__score{color:var(--accent-on-dark)}
+[data-ground='dark'] .proof--stack,[data-ground='dark'] .proof--stack .proof__item,
+[data-ground='dark'] .proof--feature .proof__item{border-color:var(--veil-line)}
+[data-ground='dark'] .proof--feature .proof__item:first-child{border-left-color:var(--accent-on-dark)}
+[data-ground='dark'] .proof--wall .proof__item,[data-ground='dark'] .proof--cards .proof__item{
+  background:var(--veil);border-color:var(--veil-line)}
+[data-ground='dark'] .proof--cards .proof__item::before{color:var(--accent-on-dark)}
 
 [data-ground='accent']{color:var(--accent-ink)}
 [data-ground='accent'] .eyebrow,[data-ground='accent'] .section-body,[data-ground='accent'] .lede,
@@ -220,6 +234,21 @@ a{color:inherit}
 [data-ground='accent'] .mosaic__cell{background:transparent;border-color:currentColor;color:currentColor}
 [data-ground='accent'] .button--primary{background:var(--accent-ink);color:var(--accent)}
 [data-ground='accent'] .pull-quote{border-color:currentColor;color:currentColor}
+[data-ground='accent'] .faq p,[data-ground='accent'] .faq summary,
+[data-ground='accent'] .faq summary:hover,[data-ground='accent'] .faq details[open] summary,
+[data-ground='accent'] .faq summary::after,[data-ground='accent'] .qa-item p{color:currentColor}
+[data-ground='accent'] .faq,[data-ground='accent'] .faq details,
+[data-ground='accent'] .faq summary::after{border-color:currentColor}
+[data-ground='accent'] .faq summary:hover::after{background:transparent}
+[data-ground='accent'] .faq details[open] summary::after{background:var(--accent-ink);color:var(--accent)}
+[data-ground='accent'] .proof__quote,[data-ground='accent'] .proof__attribution,
+[data-ground='accent'] .proof__source,[data-ground='accent'] .proof__stars,
+[data-ground='accent'] .proof__score,[data-ground='accent'] .proof--cards .proof__item::before{color:currentColor}
+[data-ground='accent'] .proof--stack,[data-ground='accent'] .proof--stack .proof__item,
+[data-ground='accent'] .proof--feature .proof__item{border-color:currentColor}
+[data-ground='accent'] .proof--feature .proof__item:first-child{border-left-color:currentColor}
+[data-ground='accent'] .proof--wall .proof__item,[data-ground='accent'] .proof--cards .proof__item{
+  background:transparent;border-color:currentColor}
 
 /* ---- background treatments ----------------------------------------- */
 .section::before,.hero::before{content:'';position:absolute;inset:0;pointer-events:none;z-index:0}
@@ -543,20 +572,112 @@ h1{font-size:clamp(var(--size-h1-min),1.2rem + 5.4vw,var(--size-h1))}
   padding:16px 18px;border-top:var(--border) solid var(--line);min-width:0;overflow-wrap:break-word}
 .rail__bullet{color:var(--accent-text);font-weight:800}
 
-/* ---- layout: faq --------------------------------------------------- */
-.faq{margin:32px 0 0;border-top:var(--border) solid var(--line)}
+/* ---- layout: faq ----------------------------------------------------
+   Native disclosure, designed rather than defaulted.
+
+   The details element stays. The compiled document is served under a policy
+   with script-src 'none', so an ARIA accordion built from buttons could not be
+   wired up at all — and it would only be reimplementing the button role,
+   keyboard operation and focus behaviour the element already has. Everything
+   below is styling laid over what the browser does correctly.
+
+   A page can now carry sixteen questions, so length is a design problem: the
+   quantity query tightens the row once a list gets long, the answer keeps a
+   reading measure instead of running the full container, and the indicator
+   is a real target rather than a glyph hanging off the end of a line. */
+.faq{margin:clamp(28px,3.4vw,52px) 0 0;border-top:var(--border) solid var(--line)}
 .faq details{border-bottom:var(--border) solid var(--line)}
-.faq summary{display:flex;justify-content:space-between;align-items:center;gap:18px;cursor:pointer;
-  padding:20px 0;font-weight:700;list-style:none;font-size:1.05rem}
+.faq summary{display:flex;justify-content:space-between;align-items:center;gap:clamp(16px,2.2vw,36px);
+  cursor:pointer;list-style:none;font-weight:700;border-radius:var(--radius);
+  padding-block:var(--faq-row,clamp(18px,1.9vw,27px));padding-inline:2px;
+  font-size:clamp(1.02rem,.98rem + .32vw,calc(var(--size-h3) * 1.08));line-height:1.35}
 .faq summary::-webkit-details-marker{display:none}
-.faq summary::after{content:'+';font-weight:700;font-size:1.3rem;line-height:1;color:var(--accent-text)}
-.faq details[open] summary::after{content:'\\2212'}
-.faq p{margin:0 0 22px;color:var(--ink-muted);max-width:var(--measure)}
+.faq summary:hover{color:var(--accent-text)}
+.faq summary:focus-visible{outline:3px solid var(--accent);outline-offset:-3px}
+.faq summary::after{content:'+';display:grid;place-items:center;flex:none;width:34px;height:34px;
+  font-weight:400;font-size:1.5rem;line-height:1;color:var(--accent-text);
+  border:var(--border) solid var(--line);border-radius:999px;
+  transition:transform .25s ease,background-color .25s ease,color .25s ease,border-color .25s ease}
+.faq summary:hover::after{background:var(--accent-soft);border-color:var(--accent)}
+/* A plus rotated through 45 degrees is a close mark, and it is the same glyph
+   the whole way — swapping the character to a minus cannot be animated. */
+.faq details[open] summary{color:var(--accent-text)}
+.faq details[open] summary::after{transform:rotate(45deg);background:var(--accent);
+  color:var(--accent-ink);border-color:transparent}
+.faq p{margin:0 2px clamp(20px,2.2vw,30px);color:var(--ink-muted);max-width:var(--measure)}
+/* Quantity query: nine or more questions and the rhythm tightens, so a long
+   list reads as a considered index rather than as a page that would not end. */
+.faq details:nth-last-child(n+9),.faq details:nth-last-child(n+9) ~ details{--faq-row:clamp(14px,1.5vw,21px)}
+/* Height is not animatable from a keyword, so the smooth open is scoped to
+   engines that support both halves of the modern disclosure model. Where they
+   are missing the panel simply appears, which is the browser default. */
+@supports (interpolate-size:allow-keywords) and selector(::details-content){
+  html{interpolate-size:allow-keywords}
+  .faq details::details-content{block-size:0;overflow:clip;
+    transition:block-size .3s ease,content-visibility .3s allow-discrete}
+  .faq details[open]::details-content{block-size:auto}
+}
 [data-layout='qa-two-column'] .qa-grid{display:grid;gap:clamp(20px,3vw,44px);margin:32px 0 0;
   grid-template-columns:repeat(auto-fit,minmax(min(100%,300px),1fr))}
 [data-layout='qa-two-column'] .qa-item{border-top:var(--border) solid var(--line);padding-top:18px}
 [data-layout='qa-two-column'] .qa-item h3{font-size:var(--size-h3);margin-bottom:10px}
 [data-layout='qa-two-column'] .qa-item p{margin:0;color:var(--ink-muted)}
+
+/* ---- layout: proof --------------------------------------------------
+   Approved evidence, in four arrangements.
+
+   The quotes are the Growth Engine's words and the presentation is ours, so
+   nothing here truncates, clamps to a line count, hides an overflow or fades
+   a tail out: a treatment that visually shortens an endorsement is editing it
+   in CSS. A rating is drawn only where the composer produced one, which is
+   only where the document gave both a rating and the scale it is on. */
+.proof{display:grid;gap:clamp(18px,2.2vw,32px);margin:clamp(28px,3.4vw,52px) 0 0}
+.proof__item{margin:0;min-width:0;display:flex;flex-direction:column;gap:12px}
+.proof__quote{margin:0;color:var(--ink);overflow-wrap:break-word;
+  font-family:var(--display-family);letter-spacing:var(--display-tracking);
+  font-size:clamp(1.02rem,.98rem + .45vw,calc(var(--size-h3) * 1.16));line-height:1.44}
+.proof__quote p{margin:0}
+.proof__cite{display:flex;flex-wrap:wrap;align-items:baseline;gap:4px 10px;font-size:.86rem;line-height:1.45}
+.proof__attribution{font-weight:700;color:var(--ink);letter-spacing:.01em}
+.proof__source{color:var(--ink-muted)}
+/* The separator belongs to the pair, not to the source: a quote carrying only
+   a source must not open with a dangling bullet. */
+.proof__attribution + .proof__source::before{content:'\\00b7\\00a0'}
+.proof__rating{margin:0;line-height:1}
+.proof__stars{font-size:1.02rem;letter-spacing:.14em;color:var(--accent-text)}
+.proof__score{display:inline-block;font-size:.76rem;font-weight:800;letter-spacing:.1em;
+  text-transform:uppercase;color:var(--accent-text)}
+
+/* A stacked index. Holds any quantity, which is why it is also the fallback. */
+.proof--stack{gap:0;border-top:var(--border) solid var(--line)}
+.proof--stack .proof__item{padding-block:clamp(20px,2.6vw,34px);border-bottom:var(--border) solid var(--line)}
+
+/* One endorsement given the weight of the beat, with any others in support. */
+.proof--feature{grid-template-columns:repeat(auto-fit,minmax(min(100%,260px),1fr));
+  gap:clamp(20px,2.6vw,40px);align-items:start}
+.proof--feature .proof__item:first-child{grid-column:1/-1;
+  border-left:3px solid var(--accent);padding-left:clamp(18px,3vw,42px)}
+.proof--feature .proof__item:first-child .proof__quote{font-weight:var(--display-weight);
+  font-size:clamp(1.34rem,1rem + 2vw,calc(var(--size-statement) * .8));line-height:1.2;max-width:26ch}
+.proof--feature .proof__item:not(:first-child){padding-top:clamp(14px,1.6vw,22px);
+  border-top:var(--border) solid var(--line)}
+
+/* A wall of reviews: enough tiles that the quantity is itself the argument. */
+.proof--wall{grid-template-columns:repeat(auto-fit,minmax(min(100%,268px),1fr));gap:clamp(14px,1.6vw,22px)}
+.proof--wall .proof__item{padding:clamp(20px,2.2vw,30px);background:var(--surface);
+  border:var(--border) solid var(--line);border-radius:var(--radius-large)}
+.proof--wall .proof__quote{font-family:var(--body-family);letter-spacing:normal;
+  font-size:clamp(.98rem,.95rem + .22vw,calc(var(--size-body) * 1.02));line-height:1.56}
+
+/* Plates, for a handful of longer testimonials beside a call to action. */
+.proof--cards{grid-template-columns:repeat(auto-fit,minmax(min(100%,300px),1fr));gap:clamp(14px,1.8vw,26px)}
+.proof--cards .proof__item{position:relative;overflow:hidden;padding:clamp(22px,2.6vw,36px);
+  background:linear-gradient(165deg,var(--accent-soft),var(--surface) 78%);
+  border:var(--border) solid var(--line);border-radius:var(--radius-large)}
+.proof--cards .proof__item::before{content:'\\201C';position:absolute;top:-.24em;right:.08em;pointer-events:none;
+  font-family:var(--display-family);font-size:clamp(4rem,8vw,7rem);line-height:1;color:var(--accent-text);
+  opacity:calc(var(--intensity) * .3)}
+.proof--cards .proof__quote,.proof--cards .proof__cite{position:relative}
 
 /* ---- lone prose ------------------------------------------------------
    A section whose only content is a paragraph is carrying the whole beat,
@@ -658,11 +779,18 @@ figure{margin:0;position:relative}
   .closing--plinth .closing__panel{padding:24px}
   [data-layout='poster-frame']{min-height:min(88vh,680px)}
   [data-layout='showcase-panel'] .showcase__copy{margin-inline:0;margin-top:-20px}
+  .faq summary{gap:14px;font-size:1.02rem}
+  .faq summary::after{width:30px;height:30px;font-size:1.32rem}
+  .proof--wall .proof__item,.proof--cards .proof__item{padding:20px}
+  .proof--feature .proof__item:first-child{padding-left:16px}
 }
 @media (prefers-reduced-motion:reduce){
   html{scroll-behavior:auto}
   *,*::before,*::after{transition:none!important;animation:none!important}
+  /* A pseudo-element the universal selector cannot reach. */
+  .faq details::details-content{transition:none!important}
   .button:hover,.card:hover,.stat:hover{transform:none}
+  .faq details[open] summary::after{transform:rotate(45deg)}
 }
 @media print{
   .skip{display:none}

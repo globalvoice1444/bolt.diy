@@ -25,18 +25,19 @@
  */
 
 /**
- * Exactly `1.0`.
+ * Exactly `1.1`.
  *
  * The schema is strict — `additionalProperties: false` throughout and a
  * closed purpose enum — so a document from a later contract version
- * cannot be validated safely by a 1.0 consumer. A 1.1 is a real minor
+ * cannot be validated safely by a 1.1 consumer, and a 1.0 consumer cannot
+ * safely read a 1.1. A minor is a real
  * release, and you adopt it by updating this file and the schema, not
  * by optimistically accepting it. Deterministic refusal beats hopeful
  * acceptance.
  */
-export type SpecVersion = '1.0'
+export type SpecVersion = '1.1'
 
-export const SUPPORTED_VERSION: SpecVersion = '1.0'
+export const SUPPORTED_VERSION: SpecVersion = '1.1'
 
 /**
  * The canonical V1 vocabulary: exactly the section kinds
@@ -53,6 +54,7 @@ export const SECTION_KINDS = [
   'pain',
   'mechanism',
   'vertical_fit',
+  'proof',
   'faq',
   'risk',
 ] as const
@@ -70,6 +72,7 @@ export const SECTION_PURPOSES = [
   'intensify_problem',
   'explain_mechanism',
   'establish_fit',
+  'establish_proof',
   'handle_objection',
   'reduce_risk',
   'drive_action',
@@ -140,6 +143,32 @@ export interface QaItem {
 }
 
 /**
+ * One piece of approved proof, verbatim (1.1).
+ *
+ * Every word belongs to the Growth Engine. A renderer MUST NOT reword,
+ * shorten, translate, merge or re-attribute a quote, and MUST NOT show
+ * one without its attribution where an attribution is given. Presenting
+ * proof is the renderer's business — a pull quote, a review wall, a card
+ * beside a call to action — and the wording is not.
+ *
+ * `rating` is null far more often than not, and null means NO RATING WAS
+ * APPROVED. It is never zero, and it is never a default: drawing four
+ * stars beside a quote that carried none is inventing proof.
+ */
+export interface ProofQuote {
+  /** The approved wording, verbatim. */
+  text: string
+  /** Who said it, or null where the approval carries none. Never invent one. */
+  attribution?: string | null
+  /** Where it was published, where that is part of the approval. */
+  source?: string | null
+  /** The rating given, on `ratingScale`. Null means none was approved. */
+  rating?: number | null
+  /** The maximum of the scale, so a renderer never has to assume five. */
+  ratingScale?: number | null
+}
+
+/**
  * Which approved facts a section rests on.
  *
  * Present on every section. The array may be empty where that is
@@ -166,6 +195,8 @@ export interface PageSpecSection {
   body?: string | null
   items?: string[]
   qa?: QaItem[]
+  /** Required on a `proof` section, and emitted on no other kind. */
+  quotes?: ProofQuote[]
   asset?: Asset
 }
 

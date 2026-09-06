@@ -14,7 +14,7 @@ import { requireValidPageSpec, type PageSpecValidationOptions } from './validato
 
 export const PAGESPEC_COMPILER_VERSION = 'ithinq-pagespec-renderer/0.3.0';
 export const PAGESPEC_CONTRACT_SOURCE =
-  'globalvoice1444/ithinq-partner-network@51c103ff2492b068095dc356225d5d9ef496b44b';
+  'globalvoice1444/ithinq-partner-network@68e39981235c95c48513dd29b2b8cfe35ba8931b';
 
 export interface CompilePageSpecOptions extends PageSpecValidationOptions, PlanOptions {
   /**
@@ -71,7 +71,7 @@ export function canonicalJson(value: unknown): string {
  * involved, and the same input always produces byte-identical output.
  *
  * Creative direction and creative intent are presentation inputs and travel in
- * the options, never in the document. The vendored contract stays at 1.0.
+ * the options, never in the document. The vendored contract is 1.1.
  */
 export function compilePageSpecToProjectManifest(
   input: unknown,
@@ -88,7 +88,7 @@ export function compilePageSpecToProjectManifest(
 
   const metadata = {
     compiler: PAGESPEC_COMPILER_VERSION,
-    contract: 'PageSpec 1.0' as const,
+    contract: 'PageSpec 1.1' as const,
     contractSource: PAGESPEC_CONTRACT_SOURCE,
     pageReference: spec.page.reference,
     direction: direction.id,

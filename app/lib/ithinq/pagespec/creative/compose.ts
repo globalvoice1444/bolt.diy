@@ -1,6 +1,7 @@
-import type { Cta, PageSpec, PageSpecSection } from '@ithinq-pagespec/page-spec';
+import type { Cta, PageSpec, PageSpecSection, ProofQuote } from '@ithinq-pagespec/page-spec';
 import { effectiveSection, sectionCopyAt, type CopyText } from './copy-text';
 import type { CreativeDirection } from './directions';
+import { isEmptyProof } from './plan';
 import { buildStylesheet } from './stylesheet';
 import type { CreativePresentationPlan, SectionPresentation } from './types';
 
@@ -262,6 +263,126 @@ function renderQa(section: PageSpecSection, presentation: SectionPresentation): 
   return `<div class="faq">${rows}</div>`;
 }
 
+/** A rating, written the way it was given. Never localised, never rounded. */
+function formatScore(value: number): string {
+  return String(value);
+}
+
+/**
+ * A rating renders only when the document gave one AND said what scale it is
+ * on.
+ *
+ * This is a truth rule, not a style rule. `rating` is null far more often than
+ * not, and null means no rating was approved — it is never zero and never a
+ * default. Assuming a scale of five would be inventing the denominator of
+ * somebody else's evidence, so a rating without `ratingScale` renders nothing
+ * at all rather than something plausible.
+ *
+ * Star glyphs are drawn only where they can be honest: whole numbers on a
+ * whole scale small enough to draw. A 4.5 out of 5 gets the numerals, because
+ * five characters cannot say "four and a half" and rounding it up would be a
+ * lie told in a font. A rating of zero takes the numerals too — a row of empty
+ * outlines reads as a broken widget rather than as a score.
+ */
+function renderRating(quote: ProofQuote): string {
+  const { rating, ratingScale } = quote;
+
+  if (typeof rating !== 'number' || !Number.isFinite(rating)) {
+    return '';
+  }
+
+  if (typeof ratingScale !== 'number' || !Number.isFinite(ratingScale)) {
+    return '';
+  }
+
+  if (ratingScale < 1 || rating < 0 || rating > ratingScale) {
+    return '';
+  }
+
+  const label = `Rated ${formatScore(rating)} out of ${formatScore(ratingScale)}`;
+  const drawable = rating > 0 && Number.isInteger(rating) && Number.isInteger(ratingScale) && ratingScale <= 10;
+
+  if (!drawable) {
+    return `<p class="proof__rating"><span class="proof__score">${escapeHtml(label)}</span></p>`;
+  }
+
+  const glyphs = '&#9733;'.repeat(rating) + '&#9734;'.repeat(ratingScale - rating);
+
+  return `<p class="proof__rating"><span class="proof__stars" role="img" ${attr('aria-label', label)}>${glyphs}</span></p>`;
+}
+
+/**
+ * One approved quote, verbatim.
+ *
+ * Every word belongs to the Growth Engine: nothing here reworders, shortens,
+ * truncates, merges or re-attributes. Attribution and source render when the
+ * approval carried them and are absent from the document when it did not,
+ * which is why each is tested for presence rather than defaulted to a
+ * placeholder.
+ */
+function renderQuote(quote: ProofQuote): string {
+  const cite: string[] = [];
+
+  if (quote.attribution) {
+    cite.push(`<span class="proof__attribution">${escapeHtml(quote.attribution)}</span>`);
+  }
+
+  if (quote.source) {
+    cite.push(`<span class="proof__source">${escapeHtml(quote.source)}</span>`);
+  }
+
+  const caption = cite.length > 0 ? `<figcaption class="proof__cite">${cite.join('')}</figcaption>` : '';
+
+  return (
+    '<figure class="proof__item">' +
+    renderRating(quote) +
+    `<blockquote class="proof__quote"><p>${escapeHtml(quote.text)}</p></blockquote>` +
+    caption +
+    '</figure>'
+  );
+}
+
+/**
+ * Which arrangement the quotes are presented in.
+ *
+ * The planner has already chosen from the archetype's preferences, gated on
+ * how many quotes were approved; this maps that decision onto an arrangement.
+ * `stack` is the fallback because it holds any quantity — a proof section can
+ * reach a layout the planner picked for a picture or for prose, and losing a
+ * testimonial to a composition that preferred a different shape is exactly the
+ * failure `renderItems` already refuses to make.
+ */
+function proofArrangement(presentation: SectionPresentation): string {
+  switch (presentation.layout) {
+    case 'testimonial-feature':
+      return 'proof--feature';
+    case 'review-wall':
+      return 'proof--wall';
+    case 'proof-cards':
+      return 'proof--cards';
+    default:
+      return 'proof--stack';
+  }
+}
+
+/**
+ * Approved proof.
+ *
+ * Every quote renders, under every arrangement. An empty or absent array
+ * renders nothing at all — the planner drops such a section before it reaches
+ * here, and this is the second half of the same rule: a heading promising
+ * evidence with no evidence under it is worse than no section.
+ */
+function renderProof(section: PageSpecSection, presentation: SectionPresentation): string {
+  const quotes = section.quotes ?? [];
+
+  if (quotes.length === 0) {
+    return '';
+  }
+
+  return `<div class="proof ${proofArrangement(presentation)}">${quotes.map(renderQuote).join('')}</div>`;
+}
+
 function shellClass(presentation: SectionPresentation): string {
   if (presentation.width === 'narrow') {
     return 'shell shell--narrow';
@@ -297,6 +418,19 @@ function renderSection(
    * The planner built this presentation from the same view.
    */
   const rendered = effectiveSection(section, sectionCopy);
+
+  /*
+   * The other half of the planner's rule, for a plan built elsewhere.
+   *
+   * A `proof` beat whose quotes never arrived has nothing to show, and its
+   * heading would promise evidence the page cannot produce. The planner drops
+   * it before a presentation exists; this refuses it again at the point of
+   * composition rather than trusting that it did.
+   */
+  if (isEmptyProof(rendered)) {
+    return '';
+  }
+
   const generated = presentation.generatedAssetNeedId ? media.get(presentation.generatedAssetNeedId) : undefined;
 
   let splitFlavour = 'none';
@@ -306,6 +440,7 @@ function renderSection(
   const body = renderBody(rendered, presentation);
   const items = renderItems(rendered, presentation);
   const qa = renderQa(rendered, presentation);
+  const proof = renderProof(rendered, presentation);
   const image = section.asset ?? generated;
   const hasAsset = Boolean(image) && presentation.media !== 'none';
 
@@ -328,7 +463,7 @@ function renderSection(
 
   if (presentation.layout === 'poster-frame' && fieldImage) {
     /* Copy sits on the scrim, low in the frame, where the veil is heaviest. */
-    inner = `<div class="poster__copy measure">${head}${body}${qa}</div>`;
+    inner = `<div class="poster__copy measure">${head}${body}${qa}${proof}</div>`;
   } else if (presentation.layout === 'showcase-panel' && hasAsset && image) {
     /*
      * A layered composition: the picture runs wide and the copy sits on its
@@ -338,17 +473,18 @@ function renderSection(
     const plate = `<div class="showcase__copy"><div class="measure">${head}${body}</div></div>`;
 
     splitFlavour = 'media';
-    inner = `<div class="showcase">${renderAssetImage(image, 'showcase__media')}${plate}</div>` + `${items}${qa}`;
+    inner =
+      `<div class="showcase">${renderAssetImage(image, 'showcase__media')}${plate}</div>` + `${items}${qa}${proof}`;
   } else if (presentation.layout === 'chapter-opener') {
     const inset = hasAsset && image ? renderAssetImage(image, 'media-inset') : '';
     const mark = `<span class="chapter__numeral" aria-hidden="true">${ordinal(presentation.sourceIndex)}</span>`;
 
     inner =
       `<div class="chapter"><div class="chapter__mark">${mark}</div>` +
-      `<div class="chapter__copy">${head}${body}</div></div>${items}${qa}${inset}`;
+      `<div class="chapter__copy">${head}${body}</div></div>${items}${qa}${proof}${inset}`;
   } else if (SPLIT_LAYOUTS.has(presentation.layout)) {
     const mediaFigure = hasAsset && image ? renderAssetImage(image, 'layout__media') : '';
-    const aside = items || qa;
+    const aside = items || qa || proof;
 
     /*
      * A split composition must fill both columns. With an asset it is copy
@@ -364,7 +500,7 @@ function renderSection(
     if (mediaFigure) {
       left = `<div class="layout__copy measure">${head}${body}</div>`;
       right = mediaFigure;
-      trailing = `${items}${qa}`;
+      trailing = `${items}${qa}${proof}`;
     } else if (aside) {
       left = `<div class="layout__copy measure">${head}${body}</div>`;
       right = `<div class="layout__aside">${aside}</div>`;
@@ -378,10 +514,10 @@ function renderSection(
         ? `<div class="layout">${right}${left}</div>${trailing}`
         : `<div class="layout">${left}${right}</div>${trailing}`;
   } else if (presentation.layout === 'media-full-bleed' && fieldImage) {
-    inner = `${head}${body}${items}${qa}`;
+    inner = `${head}${body}${items}${qa}${proof}`;
   } else {
     const inset = hasAsset && image ? renderAssetImage(image, 'media-inset') : '';
-    inner = `${head}${body}${items}${qa}${inset}`;
+    inner = `${head}${body}${items}${qa}${proof}${inset}`;
   }
 
   const attrs = [

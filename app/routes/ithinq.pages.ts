@@ -34,7 +34,7 @@ const MAX_BODY_BYTES = 512 * 1024;
  *   Authorization: Bearer <RENDERER_SERVICE_TOKEN>
  *   Content-Type: application/json
  *   {
- *     "spec":  <PageSpec 1.0 document>,          // required
+ *     "spec":  <PageSpec 1.1 document>,          // required
  *     "direction": "clinical-calm",              // optional; unknown is ignored
  *     "creative": {                              // optional, presentation only
  *       "mood": "luxury, restrained",            //   <= 120 chars

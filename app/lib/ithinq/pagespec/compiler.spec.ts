@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import examplePageSpec from '@ithinq-pagespec/page-spec.example.json';
-import type { PageSpec } from '@ithinq-pagespec/page-spec';
+import { SUPPORTED_VERSION, type PageSpec } from '@ithinq-pagespec/page-spec';
 import { compilePageSpecToProjectManifest } from './compiler';
 import { inlineDocumentRuntime } from './runtime';
 import { PageSpecValidationError, validatePageSpec } from './validator';
@@ -15,13 +15,28 @@ describe('PageSpec V1 renderer POC', () => {
   });
 
   it('fails closed on unsupported versions before checking anything else', () => {
-    const input: Record<string, unknown> = { ...copyFixture(), specVersion: '1.1' };
-    delete input.disclosure;
+    /*
+     * Both directions of the exactness rule. The consumer implements 1.1, so a
+     * later minor and the earlier one it was written against are equally
+     * unreadable — and each returns ONE finding with a second, structural
+     * defect deliberately left in the document to prove nothing else ran.
+     */
+    for (const version of ['1.0', '1.2', '2.0', 'one-point-one', 1.1, undefined]) {
+      const input: Record<string, unknown> = { ...copyFixture(), specVersion: version };
+      delete input.disclosure;
 
-    const result = validatePageSpec(input);
-    expect(result.renderable).toBe(false);
-    expect(result.findings).toHaveLength(1);
-    expect(result.findings[0]?.code).toBe('unsupported_spec_version');
+      const result = validatePageSpec(input);
+      expect(result.renderable, String(version)).toBe(false);
+      expect(result.findings, String(version)).toHaveLength(1);
+      expect(result.findings[0]?.code, String(version)).toBe('unsupported_spec_version');
+      expect(result.skipSections, String(version)).toEqual([]);
+    }
+  });
+
+  it('accepts the version it implements, and only that one', () => {
+    expect(SUPPORTED_VERSION).toBe('1.1');
+    expect(copyFixture().specVersion).toBe(SUPPORTED_VERSION);
+    expect(validatePageSpec(copyFixture()).renderable).toBe(true);
   });
 
   it('rejects missing disclosure structurally', () => {

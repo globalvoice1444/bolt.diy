@@ -38,6 +38,13 @@ function richFixture(): PageSpec {
       ];
     }
 
+    if (kind === 'proof') {
+      section.quotes = [
+        { text: `Approved words belonging to the ${kind} section.`, attribution: 'Named customer' },
+        { text: 'A second approved endorsement, verbatim.', source: 'Review platform', rating: 5, ratingScale: 5 },
+      ];
+    }
+
     if (kind === 'mechanism') {
       section.asset = { url: 'https://ithinq.ai/media/mechanism.png', kind: 'image', alt: 'Mechanism diagram' };
     }
@@ -202,7 +209,8 @@ describe('validation is unaffected by presentation', () => {
   });
 
   it('still enforces the exact contract version', () => {
-    const spec = { ...richFixture(), specVersion: '1.1' };
+    /* The version this consumer does NOT implement. 1.1 is now the one it does. */
+    const spec = { ...richFixture(), specVersion: '1.2' };
 
     for (const direction of DIRECTION_IDS) {
       expect(() => compilePageSpecToProjectManifest(spec, { direction })).toThrow(PageSpecValidationError);

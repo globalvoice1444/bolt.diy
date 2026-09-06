@@ -128,6 +128,24 @@ function qaCount(section: PageSpecSection): number {
   return section.qa?.length ?? 0;
 }
 
+function quoteCount(section: PageSpecSection): number {
+  return section.quotes?.length ?? 0;
+}
+
+/**
+ * A `proof` section with nothing approved behind it is not a section.
+ *
+ * The schema makes this unreachable through the validator — `quotes` is
+ * required on the kind and carries `minItems: 1` — but the planner is a public
+ * function and a caller can reach it directly. Rendering the heading of a
+ * proof section whose quotes never arrived would put an empty promise of
+ * evidence on the page, so the beat is dropped before it is ever planned,
+ * exactly as an unknown kind is.
+ */
+export function isEmptyProof(section: PageSpecSection): boolean {
+  return section.kind === 'proof' && quoteCount(section) === 0;
+}
+
 function hasBody(section: PageSpecSection): boolean {
   return Boolean(section.body && section.body.trim());
 }
@@ -185,6 +203,23 @@ export function isLayoutFeasible(
     case 'accordion':
     case 'qa-two-column':
       return qaCount(section) >= 1;
+
+    /*
+     * Proof treatments are gated on how much was approved, never on the kind.
+     *
+     * A feature is one endorsement given the whole beat, so it stops reading
+     * as one the moment there are several; a wall needs enough tiles to be a
+     * wall. `quote-stack` is the composition that can hold any quantity, which
+     * is why it is also what the composer falls back to.
+     */
+    case 'testimonial-feature':
+      return quoteCount(section) >= 1 && quoteCount(section) <= 3;
+    case 'review-wall':
+      return quoteCount(section) >= 3;
+    case 'proof-cards':
+      return quoteCount(section) >= 2;
+    case 'quote-stack':
+      return quoteCount(section) >= 1;
     case 'media-full-bleed':
       return hasMedia;
     case 'poster-frame':
@@ -199,7 +234,8 @@ export function isLayoutFeasible(
         Boolean(section.heading) &&
         bodyLength(section) <= 260 &&
         itemCount(section) === 0 &&
-        qaCount(section) === 0
+        qaCount(section) === 0 &&
+        quoteCount(section) === 0
       );
     case 'showcase-panel':
       /* A layered picture with the copy on its own plate beside it. */
@@ -280,7 +316,7 @@ function resolveLayout(
   avoid: SectionLayout | null,
 ): SectionLayout {
   const preferences = policy.layoutPreferences[section.kind] ?? policy.layoutPreferences.default ?? [];
-  const structured = itemCount(section) > 0 || qaCount(section) > 0;
+  const structured = itemCount(section) > 0 || qaCount(section) > 0 || quoteCount(section) > 0;
   const rotated = rotate(policy.mediaLayouts, mediaOccurrence);
   const spaced = avoid
     ? [...rotated.filter((layout) => layout !== avoid), ...rotated.filter((layout) => layout === avoid)]
@@ -444,7 +480,8 @@ export function planPresentation(
     .map(({ rawSection, sourceIndex }) => ({
       sourceIndex,
       section: effectiveSection(rawSection, sectionCopyAt(options.copy, sourceIndex)),
-    }));
+    }))
+    .filter(({ section }) => !isEmptyProof(section));
 
   const bands = assignBands(
     policy.bandPalette,

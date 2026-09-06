@@ -8,7 +8,7 @@ import { DEMO_SPECS } from './demo-specs';
  */
 describe('demo documents', () => {
   for (const entry of DEMO_SPECS) {
-    it(`${entry.id} validates against PageSpec 1.0`, () => {
+    it(`${entry.id} validates against PageSpec 1.1`, () => {
       const result = validatePageSpec(entry.spec);
 
       expect(result.findings.filter((f) => f.severity === 'fatal')).toEqual([]);

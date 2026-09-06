@@ -1,5 +1,5 @@
 {
-    "specVersion": "1.0",
+    "specVersion": "1.1",
     "page": {
         "reference": "spec:med-spa:overloaded-front-desk",
         "origin": "generated",
@@ -68,16 +68,17 @@
             "purpose": "explain_mechanism",
             "emphasis": "lead",
             "heading": "How it works",
-            "body": "Answers inbound calls. Takes the caller through the questions the team would ask. Hands the conversation back in a form the business can act on. Asks the same questions in the same order whoever is on shift. Keeps follow-up moving after the call. Answers calls outside opening hours, where your setup supports it — depends on how the setup is configured — confirm on the demo rather than assuming it is on. Does not replace the people who take the conversations that need a person.",
+            "body": "iThinq AI works as a virtual receptionist that answers calls, handles the conversation, books the appointment and follows up. The front desk stops being the bottleneck, and it covers 168 hours a week instead of 40. iThinq AI answers inbound calls 24 hours a day, every day, including the ones that arrive while the team is already on the phone. Every call is answered, including nights, weekends, lunch breaks and the three that ring at once. iThinq AI holds a natural spoken conversation, listens, asks and responds the way a trained receptionist does. Callers have an ordinary conversation instead of fighting a phone menu. iThinq AI checks availability and books the appointment during the call. The calendar fills without anybody touching it. iThinq AI confirms appointments and sends the reminders and preparation details that go with them. Fewer no-shows, and nobody on the team spends a morning confirming tomorrow. iThinq AI asks the qualifying questions the team would ask and sorts the caller before anybody picks up. Time goes to the people ready to buy instead of to everyone who dialled. iThinq AI responds to online form enquiries by calling the person back. A form filled in at 2am is answered while the interest is still live, not on Monday. iThinq AI keeps following up with a lead across repeated attempts rather than stopping after one. Follow-up stops depending on whether somebody remembered.",
             "provenance": {
                 "factRefs": [
-                    "f_96306cd554455b5bb303d64dbf5437ce7eb92545749c96e04df0ed580e62e643",
-                    "f_af61c1bdbb3db20f5b4a6ca334254274ad375a3a365c19f42709aadedbe16db0",
-                    "f_a8c46ae479f5359a6552000d08672866e39fd0dad9239f0a35376ba2e206a825",
-                    "f_c2dd9310361bfad1a0a5147dd8229dd98e1d8639388c368fa5bf6ff67a22fb91",
-                    "f_0c3606bc20c166f8f32523f27114c864f20e96baa1cfc7262b1e2dbc0fe0faad",
-                    "f_a78a68b95e01eef580dbbd9e8e5a1a24e0b98f40c327ac803ca2db51314d25a6",
-                    "f_701d06dee7d3b0362003c55f0cad1dabbda50af451c6b4b509c9501892af6e94"
+                    "f_c010a61ad3143f508d2f2623674240d86192122746e7fa0f811d821ac2682b19",
+                    "f_77be89b60f049e0f0beb5a91c9b1148646b46a21d45852364fc3cfc823bf246f",
+                    "f_aa47e811ca0d8153551053c5e751877e6bde1396414bd2bb65c54a2f2c38c5b5",
+                    "f_a385166edc4b2a1d667c1239427c4f76df69025b4f230455edbff588604bf88f",
+                    "f_715ac41382dfc313ec81e6514a41e509fc5182cb6d4f8fd44e0825b71dfd077c",
+                    "f_8eae91038e7f367c365828239f0e83bde8721a8fae181a00d238029334366524",
+                    "f_f5192092f340ac32b85512a44ea72fd33fee26c410dcb0dbd086a8fa34f704ab",
+                    "f_ebb613758c5829f2d9b49c85947461a04650ab47959a06acaefa84da1bdc7a2e"
                 ]
             }
         },
@@ -93,50 +94,102 @@
             ],
             "provenance": {
                 "factRefs": [
-                    "f_96306cd554455b5bb303d64dbf5437ce7eb92545749c96e04df0ed580e62e643",
-                    "f_af61c1bdbb3db20f5b4a6ca334254274ad375a3a365c19f42709aadedbe16db0",
-                    "f_a8c46ae479f5359a6552000d08672866e39fd0dad9239f0a35376ba2e206a825",
-                    "f_c2dd9310361bfad1a0a5147dd8229dd98e1d8639388c368fa5bf6ff67a22fb91",
-                    "f_0c3606bc20c166f8f32523f27114c864f20e96baa1cfc7262b1e2dbc0fe0faad",
-                    "f_a78a68b95e01eef580dbbd9e8e5a1a24e0b98f40c327ac803ca2db51314d25a6"
-                ]
-            }
-        },
-        {
-            "kind": "vertical_fit",
-            "purpose": "establish_fit",
-            "emphasis": "support",
-            "heading": "This is not for you if",
-            "items": [
-                "You have front-desk cover that picks up as enquiries arrive",
-                "You are looking for clinical advice rather than help with the enquiries around it"
-            ],
-            "provenance": {
-                "factRefs": [
-                    "f_701d06dee7d3b0362003c55f0cad1dabbda50af451c6b4b509c9501892af6e94",
-                    "f_001dabb344cd8491be47d7ee23614a4c5f6218d228ba841692f05cdd76d34161"
+                    "f_c010a61ad3143f508d2f2623674240d86192122746e7fa0f811d821ac2682b19",
+                    "f_77be89b60f049e0f0beb5a91c9b1148646b46a21d45852364fc3cfc823bf246f",
+                    "f_aa47e811ca0d8153551053c5e751877e6bde1396414bd2bb65c54a2f2c38c5b5",
+                    "f_a385166edc4b2a1d667c1239427c4f76df69025b4f230455edbff588604bf88f",
+                    "f_715ac41382dfc313ec81e6514a41e509fc5182cb6d4f8fd44e0825b71dfd077c",
+                    "f_8eae91038e7f367c365828239f0e83bde8721a8fae181a00d238029334366524",
+                    "f_f5192092f340ac32b85512a44ea72fd33fee26c410dcb0dbd086a8fa34f704ab",
+                    "f_ebb613758c5829f2d9b49c85947461a04650ab47959a06acaefa84da1bdc7a2e"
                 ]
             }
         },
         {
             "kind": "faq",
             "purpose": "handle_objection",
-            "emphasis": "support",
-            "heading": "Common questions",
+            "emphasis": "lead",
+            "heading": "Questions people ask before they buy",
             "qa": [
                 {
-                    "question": "If they say it sounds too technical",
-                    "answer": "That is the usual reaction, and it is fair. From your side it is a phone call — the caller has an ordinary conversation, and nobody on your team has to learn a new system to get the message. Take a look and tell me if I am wrong."
+                    "question": "Can it book consultations for aesthetic treatments?",
+                    "answer": "Yes. iThinq AI checks availability and books the consultation during the call, then confirms it and sends the preparation details. The enquiry that came in while your team was mid-treatment is already on the calendar by the time anybody is free."
                 },
                 {
-                    "question": "If they say not right now",
-                    "answer": "Totally fine. I will send the link anyway so it is there when the timing is better. No follow-up unless you want one."
+                    "question": "Patients ask about financing before they commit. Can it handle that?",
+                    "answer": "It can. iThinq AI supports financing workflows, including talking the patient through the process and capturing what is needed. High-value treatments stop stalling on a finance conversation nobody had twenty minutes to have."
+                },
+                {
+                    "question": "No-shows are killing our schedule.",
+                    "answer": "iThinq AI confirms appointments and sends reminders and preparation instructions, and it follows up when somebody does not arrive. The chair stops sitting empty because a confirmation call did not get made."
+                },
+                {
+                    "question": "Our clinic has a particular tone. Will AI sound wrong?",
+                    "answer": "You set the persona. iThinq AI can be warm and consultative or brisk and clinical, and it keeps the same voice across conversations with the same patient. It sounds like your clinic because you decided how it sounds."
+                },
+                {
+                    "question": "Our front desk is already overwhelmed. Will this add work?",
+                    "answer": "It removes it. iThinq AI takes the calls, asks the qualifying questions, books what can be booked and hands over only what genuinely needs a person. Your front desk spends its day on the patient in front of it rather than on the phone that will not stop."
+                },
+                {
+                    "question": "Can AI really replace my receptionist?",
+                    "answer": "Yes. iThinq AI answers the call, holds the conversation, qualifies the caller, books the appointment and follows up afterwards. It does not take lunch, it does not go home at five, and it does not put three callers into voicemail because it is already on the phone. Your front desk covers forty hours a week. iThinq AI covers all one hundred and sixty-eight."
+                },
+                {
+                    "question": "Will my customers know they are talking to AI?",
+                    "answer": "They have an ordinary spoken conversation. iThinq AI listens, asks the questions your team would ask and responds naturally, so the caller gets to the point instead of fighting a phone menu. You choose the persona it uses, so it sounds like your business rather than like software."
+                },
+                {
+                    "question": "What happens when several people call at once?",
+                    "answer": "They all get answered. A receptionist handles one call at a time and everybody else hears a ring-out or a voicemail greeting. iThinq AI handles inbound calls around the clock, so the morning rush stops costing you the two callers who could not get through."
+                },
+                {
+                    "question": "What about calls that come in after we close?",
+                    "answer": "They are answered the same way as the ones at eleven in the morning. iThinq AI runs 24 hours a day, books appointments and captures what the caller needs. The enquiry that arrives at nine at night is yours instead of going to whoever picks up first tomorrow."
+                },
+                {
+                    "question": "What happens if a caller needs to speak to a person?",
+                    "answer": "The conversation reaches a person. Escalation is part of how iThinq AI works, not evidence that it cannot handle the call. What changes is that a human is spending their time on the conversation that genuinely needed one, instead of on the forty routine calls in front of it."
+                },
+                {
+                    "question": "Will it work with the systems we already use?",
+                    "answer": "iThinq AI integrates with your CRM, so a conversation lands as a record rather than as a note somebody has to type up later. Calls are transcribed, and the activity is reported back, so what happens on the phone becomes something you can actually manage."
+                },
+                {
+                    "question": "We only miss a few calls. Is this worth it?",
+                    "answer": "Count them properly before you answer that. Every missed call is somebody who had already decided to contact you and is now dialling the next business on the list. If you spend anything at all on advertising, an unanswered phone is where that money stops working. iThinq AI answers all of them."
+                },
+                {
+                    "question": "Our problem is not answering calls, it is following up.",
+                    "answer": "Then this is the part to look at. iThinq AI follows up persistently rather than once, makes outbound calls, processes callbacks and responds to website enquiries by ringing the person back. Follow-up stops depending on whether anyone remembered on a busy day."
+                },
+                {
+                    "question": "Somebody fills in our website form at midnight. What happens?",
+                    "answer": "iThinq AI calls them back. A form is a person who was interested enough to type their details in, and the value of that interest falls every hour it sits unanswered. Responding while they are still thinking about it is the whole difference."
+                },
+                {
+                    "question": "Some of our customers do not speak English as a first language.",
+                    "answer": "iThinq AI holds conversations in multiple languages, including English and Spanish. A caller who would otherwise have hung up gets served in the language they are comfortable in, and that call becomes a booking instead of a bounce."
+                },
+                {
+                    "question": "Do customers have to repeat themselves every time they call?",
+                    "answer": "No. iThinq AI carries what was said in earlier conversations forward, and keeps the same voice across them. A returning customer picks up where they left off rather than starting again with a stranger."
                 }
             ],
             "provenance": {
                 "factRefs": [
-                    "f_701d06dee7d3b0362003c55f0cad1dabbda50af451c6b4b509c9501892af6e94",
-                    "f_001dabb344cd8491be47d7ee23614a4c5f6218d228ba841692f05cdd76d34161"
+                    "f_c010a61ad3143f508d2f2623674240d86192122746e7fa0f811d821ac2682b19",
+                    "f_77be89b60f049e0f0beb5a91c9b1148646b46a21d45852364fc3cfc823bf246f",
+                    "f_aa47e811ca0d8153551053c5e751877e6bde1396414bd2bb65c54a2f2c38c5b5",
+                    "f_a385166edc4b2a1d667c1239427c4f76df69025b4f230455edbff588604bf88f",
+                    "f_715ac41382dfc313ec81e6514a41e509fc5182cb6d4f8fd44e0825b71dfd077c",
+                    "f_f5192092f340ac32b85512a44ea72fd33fee26c410dcb0dbd086a8fa34f704ab",
+                    "f_ebb613758c5829f2d9b49c85947461a04650ab47959a06acaefa84da1bdc7a2e",
+                    "f_8425e7281c55d84977e8c57263f7f58f9d54d0490269aa6bbaac19bf5a2ee4ba",
+                    "f_d50aef2e03a6f2f55ebdb6ebe69b79d5f602891de2cdbd4ca3c1de4b7434eabd",
+                    "f_0af88cf19709c71e5d0238ce9cf2de66087bc5c4c94b6189f0811adfa3e06d42",
+                    "f_1e2d15ed6a8e3ca4a1e2921eb28b53849cb212665683cddde93cde9847068e10",
+                    "f_a9576009ebf09bef874fb7743bb06db9d266f48eb397f1456e22d7386405496c"
                 ]
             }
         }

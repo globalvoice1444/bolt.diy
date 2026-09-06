@@ -1,4 +1,4 @@
-# PageSpec V1 — consumer handoff
+# PageSpec V1.1 — consumer handoff
 
 The authoritative contract the iThinq **Growth Engine** emits for an external renderer.
 
@@ -62,7 +62,7 @@ A renderer never writes, rewrites, summarises, translates, shortens, reorders, i
 ## Consumer flow
 
 1. Receive the PageSpec document.
-2. **Validate `specVersion`.** Accept exactly `1.0`; refuse everything else, including `1.1`.
+2. **Validate `specVersion`.** Accept exactly `1.1`; refuse everything else, including `1.0` and `1.2`.
 3. **Validate structurally** against `page-spec.schema.json`.
 4. **Run the runtime rules** below (URLs, disclosure, unknown kinds). They are not expressible in JSON Schema.
 5. Select local presentation components by section `kind`, informed by `purpose` and `emphasis`.
@@ -75,15 +75,22 @@ Never render a partially valid page. If validation returns `renderable: false`, 
 
 ## Versioning — exact, and fail closed
 
-`specVersion` is `MAJOR.MINOR`. **A consumer supports exactly the version it implements. V1 consumers accept `1.0` and refuse everything else** — `1.1`, `2.0`, malformed strings, anything.
+`specVersion` is `MAJOR.MINOR`. **A consumer supports exactly the version it implements. This contract is `1.1`, so a 1.1 consumer accepts `1.1` and refuses everything else** — `1.0`, `1.2`, `2.0`, malformed strings, anything.
 
 This is deliberate, and it is a correction of an earlier draft that promised forward compatibility this schema does not have:
 
-- `additionalProperties: false` applies throughout, so a field added in `1.1` **fails validation**.
-- `sectionPurpose` is a closed enum, so a purpose added in `1.1` fails **before** unknown-kind degradation ever runs.
+- `additionalProperties: false` applies throughout, so a field added in a later minor **fails validation**.
+- `sectionPurpose` is a closed enum, so a purpose added in a later minor fails **before** unknown-kind degradation ever runs.
 - The TypeScript knows only today's values.
 
-Accepting an unseen minor against a strict schema is optimism, not compatibility. A `1.1` remains a real minor release — but a renderer adopts it by **updating its copied schema and types**, then changing `SUPPORTED_VERSION`. Deterministic refusal beats hopeful acceptance.
+Accepting an unseen minor against a strict schema is optimism, not compatibility. A minor remains a real release — a renderer adopts it by **updating its copied schema and types**, then changing `SUPPORTED_VERSION`. Deterministic refusal beats hopeful acceptance.
+
+### What 1.1 added
+
+- Section kind **`proof`** and section purpose **`establish_proof`**, with a producer behind them: `PageSpecComposer` emits proof from the approved proof library. This is the change the 1.0 note below anticipated.
+- Section property **`quotes`**, required on a `proof` section and emitted on no other kind.
+
+A `proof` section is emitted **only where approved proof exists**. No proof means no section — never an empty panel, never a placeholder. `rating` is null unless a rating was approved, and it travels with `ratingScale` or not at all: a renderer must never assume a five-point scale, and must never draw a rating that was not given.
 
 | Change | Version impact |
 | --- | --- |
@@ -115,6 +122,7 @@ The canonical vocabulary is **exactly what `PageSpecComposer` emits** — one ki
 | `pain` | `heading`, `body` | `eyebrow`, `asset` | generated, legacy |
 | `mechanism` | `heading`, `body` | `eyebrow`, `asset` | generated, legacy |
 | `vertical_fit` | `heading`, `items[]` | `eyebrow` | generated, legacy |
+| `proof` | `heading`, `quotes[]` | `eyebrow` | generated |
 | `faq` | `heading`, `qa[]` | `eyebrow` | generated, legacy |
 | `risk` | `heading`, `body` | `eyebrow`, `asset` | generated |
 
@@ -135,7 +143,9 @@ Both are required at the top level of every document. **Where** you draw them �
 
 ### Producer gaps
 
-`benefits` and `proof` are **not** V1 kinds. Benefit cards and approved proof exist as blocks on hand-authored templates, but the composer emits neither, and "legacy-only" is not a licence to sit in a vocabulary derived from the composer. The legacy adapter **drops** those blocks rather than bending them into a kind that means something else; `LegacyPromoPageAdapter::UNREPRESENTABLE` names every dropped type. **The legacy adapter is therefore lossy, by design.** When the composer learns to emit them they arrive as a minor version, with a producer behind them.
+`benefits` is **not** a kind. Benefit cards exist as blocks on hand-authored templates, but the composer does not emit them, and "legacy-only" is not a licence to sit in a vocabulary derived from the composer. The legacy adapter **drops** those blocks rather than bending them into a kind that means something else; `LegacyPromoPageAdapter::UNREPRESENTABLE` names every dropped type. **The legacy adapter is therefore lossy, by design.**
+
+`proof` **was** in that list and is now a kind, in 1.1, on exactly the terms this paragraph set: a producer emits it. That is the bar for anything else joining the vocabulary.
 
 ### Required, optional and nullable, by origin
 

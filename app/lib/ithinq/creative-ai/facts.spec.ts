@@ -54,7 +54,9 @@ describe('resolving facts from provenance.factRefs', () => {
 
     expect(unresolved).toEqual([]);
     expect(facts.length).toBe(contractExample.sections[mechanism]!.provenance.factRefs.length);
-    expect(facts.map((fact) => fact.text)).toContain('Answers inbound calls.');
+    expect(facts.map((fact) => fact.text)).toContain(
+      'iThinq AI answers inbound calls 24 hours a day, every day, including the ones that arrive while the team is already on the phone',
+    );
   });
 
   it('keeps the document’s own order', () => {

@@ -4,7 +4,7 @@ export interface ProjectManifest {
   files: Readonly<Record<`/${string}`, string>>;
   metadata: {
     compiler: string;
-    contract: 'PageSpec 1.0';
+    contract: 'PageSpec 1.1';
     contractSource: string;
     pageReference: string;
 
