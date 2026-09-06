@@ -115,10 +115,31 @@ function renderBody(section: PageSpecSection, presentation: SectionPresentation)
     return `<p class="manifesto">${text}</p>`;
   }
 
-  /* A drop cap needs a paragraph to sit in; short copy is marked so it is skipped. */
-  const long = body.length >= 180 ? ' prose--long' : '';
+  /*
+   * Prose flavours, not prose surgery.
+   *
+   * Every treatment below keeps the body as one contiguous run of escaped
+   * text. A pull-out that lifted the opening sentence into its own element
+   * would read well and quietly change what the document says, so range here
+   * is bought with scale, measure, columns and position instead.
+   */
+  const flavour =
+    presentation.layout === 'column-essay'
+      ? ' prose--columns'
+      : presentation.layout === 'display-statement'
+        ? ' prose--statement'
+        : '';
 
-  return `<div class="prose${long}"><p class="section-body">${text}</p></div>`;
+  /*
+   * A drop cap needs a paragraph to sit in, so short copy is marked to skip
+   * it. Column-set copy skips it too: a floated capital is counted by the
+   * column balancer, which leaves one column two lines shorter than the other
+   * for no reason a reader can see.
+   */
+  const plain = presentation.layout === 'display-statement' || presentation.layout === 'column-essay';
+  const long = body.length >= 180 && !plain ? ' prose--long' : '';
+
+  return `<div class="prose${long}${flavour}"><p class="section-body">${text}</p></div>`;
 }
 
 /**
@@ -279,16 +300,53 @@ function renderSection(
   const generated = presentation.generatedAssetNeedId ? media.get(presentation.generatedAssetNeedId) : undefined;
 
   let splitFlavour = 'none';
-  const head = renderHead(rendered, presentation, showIndex);
+
+  /* A chapter opener draws its own numeral; two would be a mistake, not a motif. */
+  const head = renderHead(rendered, presentation, showIndex && presentation.layout !== 'chapter-opener');
   const body = renderBody(rendered, presentation);
   const items = renderItems(rendered, presentation);
   const qa = renderQa(rendered, presentation);
   const image = section.asset ?? generated;
   const hasAsset = Boolean(image) && presentation.media !== 'none';
 
+  /*
+   * The picture as the field the section is drawn on.
+   *
+   * Either channel supplies it. A poster additionally carries its own scrim
+   * element: the section and the figure have both already spent their
+   * pseudo-elements on background and image treatments, and two rules
+   * fighting over one `::after` is a defect that only shows up on the page.
+   */
+  const fieldImage =
+    hasAsset && image && presentation.media === 'full-bleed'
+      ? presentation.layout === 'poster-frame'
+        ? `${renderAssetImage(image, 'media-poster')}<div class="poster__veil" aria-hidden="true"></div>`
+        : renderAssetImage(image, 'media-full-bleed')
+      : '';
+
   let inner: string;
 
-  if (SPLIT_LAYOUTS.has(presentation.layout)) {
+  if (presentation.layout === 'poster-frame' && fieldImage) {
+    /* Copy sits on the scrim, low in the frame, where the veil is heaviest. */
+    inner = `<div class="poster__copy measure">${head}${body}${qa}</div>`;
+  } else if (presentation.layout === 'showcase-panel' && hasAsset && image) {
+    /*
+     * A layered composition: the picture runs wide and the copy sits on its
+     * own plate overlapping it. Anything else the section carries follows
+     * below, in the arrangement its own content earned.
+     */
+    const plate = `<div class="showcase__copy"><div class="measure">${head}${body}</div></div>`;
+
+    splitFlavour = 'media';
+    inner = `<div class="showcase">${renderAssetImage(image, 'showcase__media')}${plate}</div>` + `${items}${qa}`;
+  } else if (presentation.layout === 'chapter-opener') {
+    const inset = hasAsset && image ? renderAssetImage(image, 'media-inset') : '';
+    const mark = `<span class="chapter__numeral" aria-hidden="true">${ordinal(presentation.sourceIndex)}</span>`;
+
+    inner =
+      `<div class="chapter"><div class="chapter__mark">${mark}</div>` +
+      `<div class="chapter__copy">${head}${body}</div></div>${items}${qa}${inset}`;
+  } else if (SPLIT_LAYOUTS.has(presentation.layout)) {
     const mediaFigure = hasAsset && image ? renderAssetImage(image, 'layout__media') : '';
     const aside = items || qa;
 
@@ -319,7 +377,7 @@ function renderSection(
       presentation.media === 'leading'
         ? `<div class="layout">${right}${left}</div>${trailing}`
         : `<div class="layout">${left}${right}</div>${trailing}`;
-  } else if (presentation.layout === 'media-full-bleed' && image) {
+  } else if (presentation.layout === 'media-full-bleed' && fieldImage) {
     inner = `${head}${body}${items}${qa}`;
   } else {
     const inset = hasAsset && image ? renderAssetImage(image, 'media-inset') : '';
@@ -346,10 +404,8 @@ function renderSection(
   ].join(' ');
 
   const chapter = presentation.chapterStart ? '<hr class="chapter-rule">' : '';
-  const fullBleed =
-    presentation.media === 'full-bleed' && section.asset ? renderAssetImage(section.asset, 'media-full-bleed') : '';
 
-  return `${chapter}<section ${attrs}>${fullBleed}<div class="${shellClass(presentation)}">${inner}</div></section>`;
+  return `${chapter}<section ${attrs}>${fieldImage}<div class="${shellClass(presentation)}">${inner}</div></section>`;
 }
 
 function renderHero(
@@ -366,6 +422,16 @@ function renderHero(
         : undefined;
   const media = heroAsset ? renderAssetImage(heroAsset, 'hero__media') : '';
 
+  /*
+   * A field hero is the picture, so the picture is a child of the section
+   * rather than of the shell. Inside the shell it was positioned against the
+   * centred container and stopped at the page gutters — a "full bleed" that
+   * bled to nothing, which only became visible once the image stopped being
+   * painted at 40% opacity. The scrim travels with it.
+   */
+  const field = media && plan.hero.media === 'full-bleed';
+  const fieldMedia = field ? `${media}<div class="hero__veil" aria-hidden="true"></div>` : '';
+
   const copy = [
     '<div class="hero__copy">',
     `<p class="eyebrow audience">${escapeHtml(copyText?.audience ?? spec.page.audience)}</p>`,
@@ -376,14 +442,16 @@ function renderHero(
     '</div>',
   ].join('');
 
-  const grid =
-    plan.hero.media === 'trailing' && media
+  const grid = field
+    ? `<div class="hero__grid">${copy}</div>`
+    : plan.hero.media === 'trailing' && media
       ? `<div class="hero__grid">${copy}${media}</div>`
       : `<div class="hero__grid">${media}${copy}</div>`;
 
   return [
     `<section class="hero band-${plan.hero.band}" ${attr('data-hero', plan.hero.variant)} ` +
       `${attr('data-ground', plan.hero.ground)} ${attr('data-section-index', 'hero')} aria-labelledby="page-headline">`,
+    fieldMedia,
     `<div class="shell">${grid}</div>`,
     '</section>',
   ].join('');

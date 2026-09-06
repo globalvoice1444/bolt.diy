@@ -2,10 +2,10 @@ import { describe, expect, it } from 'vitest';
 import examplePageSpec from '@ithinq-pagespec/page-spec.example.json';
 import type { PageSpec, PageSpecSection } from '@ithinq-pagespec/page-spec';
 import { compilePageSpecToProjectManifest } from '~/lib/ithinq/pagespec/compiler';
-import { contrastHex } from './colour';
+import { composite, contrastHex } from './colour';
 import { normaliseCreativeIntent } from './intent';
-import { planPresentation } from './plan';
-import { DIRECTION_IDS, type PageCreativeIntent } from './index';
+import { isLayoutFeasible, planPresentation } from './plan';
+import { DIRECTION_IDS, type PageCreativeIntent, type SectionLayout } from './index';
 
 /*
  * The generative design system, held to the promises it makes.
@@ -160,6 +160,88 @@ function medSpaSpec(): PageSpec {
 
   return spec;
 }
+
+/**
+ * The document the Partner Network actually emits.
+ *
+ * Its composer writes `body` for the interrupt, scenario, pain, mechanism and
+ * risk beats, `items` only for `vertical_fit` and `qa` only for `faq`. A page
+ * is therefore mostly body-only prose, which is the shape both halves of this
+ * work have to hold up under: image-led compositions have to be reachable for
+ * it, and the prose that carries no picture still has to have range.
+ */
+function proseSpec(): PageSpec {
+  const spec = fixture();
+  spec.page.reference = 'spec:accounting:unanswered-enquiry';
+  spec.page.vertical = 'accounting';
+  spec.page.campaign = 'vertical-accounting';
+  spec.page.headline = 'The client email that sat unanswered for four days';
+  spec.sections = [
+    section({
+      kind: 'interrupt',
+      purpose: 'interrupt_pattern',
+      emphasis: 'lead',
+      heading: 'Nobody meant to ignore it',
+      body: 'The enquiry arrived on a Thursday afternoon, between a payroll run and a VAT deadline, and it was still sitting there on Monday morning when the prospect signed with somebody else.',
+    }),
+    section({
+      kind: 'scenario',
+      purpose: 'create_recognition',
+      heading: 'The situation',
+      body: 'Every partner is billable. The phone rings through to a shared mailbox that three people watch and nobody owns, and the enquiries that arrive between four and six are read the following day at best.',
+    }),
+    section({
+      kind: 'mechanism',
+      purpose: 'explain_mechanism',
+      emphasis: 'lead',
+      heading: 'How it works',
+      body: 'The assistant answers the call the moment it arrives, whatever the hour, and asks the questions a new client enquiry needs answered before anybody bills a minute against it. It confirms what the work is, when it is needed, and who is asking. The conversation comes back in writing, in the practice inbox, in a form a partner can act on in under a minute. Nothing is lost between the first call and the engagement letter, and nobody has to sit by a telephone to make that true.',
+    }),
+    section({
+      kind: 'risk',
+      purpose: 'reduce_risk',
+      heading: 'What it will not do',
+      body: 'It handles the enquiries that arrive around the work. It does not give tax advice, it does not quote a fee, and it does not pretend to be a person who can.',
+    }),
+    section({
+      kind: 'vertical_fit',
+      purpose: 'establish_fit',
+      heading: 'This suits you if',
+      items: [
+        'Two partners or more',
+        'Enquiries arrive out of hours',
+        'The mailbox is shared',
+        'Nobody owns first response',
+      ],
+    }),
+    section({
+      kind: 'faq',
+      purpose: 'handle_objection',
+      heading: 'Common questions',
+      qa: [{ question: 'Will clients know?', answer: 'They have an ordinary conversation on an ordinary phone call.' }],
+    }),
+  ];
+
+  return spec;
+}
+
+/** Compositions built around a picture rather than merely holding one. */
+const IMAGE_LED: readonly SectionLayout[] = ['media-full-bleed', 'poster-frame', 'showcase-panel', 'editorial-split'];
+
+function isImageLed(layout: SectionLayout): boolean {
+  return (IMAGE_LED as readonly string[]).includes(layout);
+}
+
+/** Generated imagery for the given section indices, by AssetNeed id. */
+function generatedFor(indices: readonly number[]) {
+  return indices.map((index) => ({
+    assetNeedId: `section-${index}`,
+    url: `/ithinq/generated/section-${index}`,
+    alt: `Illustrative photograph for section ${index}`,
+  }));
+}
+
+const SEEDS = ['one', 'two', 'three', 'four', 'five', 'six', 'seven', 'eight'] as const;
 
 const MARKETS = [
   ['dental', dentalSpec],
@@ -535,5 +617,329 @@ describe('the presentation plan stays free of business truth', () => {
     const options = { direction: 'service-bold', creative: { mood: 'bold, warm', seed: 's' } } as const;
 
     expect(planPresentation(spec, [], options)).toEqual(planPresentation(spec, [], options));
+  });
+});
+
+/*
+ * Media-aware composition.
+ *
+ * The defect these exist to stop coming back: layout selection could not see
+ * generated imagery at all. `resolveLayout` was handed the section alone, and
+ * the image-led gates asked `section.asset` — a contract field the Partner
+ * Network never populates. Every generated page therefore resolved to prose,
+ * cards and lists, and a generated section image could only ever appear as a
+ * small inset inside one of them. `media-full-bleed` was unreachable by
+ * construction.
+ */
+describe('a picture changes how a section is composed', () => {
+  it('lets generated media alone unlock an image-led layout', () => {
+    const prose = proseSpec().sections[0]!;
+
+    /* The regression, at the gate: the contract channel says no picture. */
+    expect(isLayoutFeasible('media-full-bleed', prose)).toBe(false);
+    expect(isLayoutFeasible('poster-frame', prose)).toBe(false);
+
+    /* The generated channel is a picture too. */
+    expect(isLayoutFeasible('media-full-bleed', prose, true)).toBe(true);
+    expect(isLayoutFeasible('poster-frame', prose, true)).toBe(true);
+    expect(isLayoutFeasible('showcase-panel', prose, true)).toBe(true);
+  });
+
+  it('reaches a full-bleed picture and an image-led split from generated media', () => {
+    const observed = new Set<SectionLayout>();
+
+    for (const direction of DIRECTION_IDS) {
+      for (const seed of SEEDS) {
+        const plan = planPresentation(proseSpec(), [], {
+          direction,
+          creative: { seed },
+          generatedAssetNeedIds: ['section-0', 'section-2'],
+        });
+
+        for (const item of plan.sections) {
+          if (item.generatedAssetNeedId) {
+            expect(isImageLed(item.layout) || item.media === 'inset').toBe(true);
+            observed.add(item.layout);
+          }
+        }
+      }
+    }
+
+    expect(observed.has('media-full-bleed')).toBe(true);
+    expect([...observed].filter((layout) => layout !== 'media-full-bleed').some(isImageLed)).toBe(true);
+  });
+
+  it('treats a contract asset and generated imagery as the same fact', () => {
+    for (const direction of DIRECTION_IDS) {
+      for (const seed of SEEDS) {
+        const withAsset = proseSpec();
+        withAsset.sections[2]!.asset = {
+          url: 'https://ithinq.ai/media/mechanism.png',
+          kind: 'image',
+          alt: 'Mechanism photograph',
+        };
+
+        const contract = planPresentation(withAsset, [], { direction, creative: { seed } });
+        const generated = planPresentation(proseSpec(), [], {
+          direction,
+          creative: { seed },
+          generatedAssetNeedIds: ['section-2'],
+        });
+
+        const label = `${direction}/${seed}`;
+
+        expect(
+          generated.sections.map((item) => `${item.layout}:${item.media}`),
+          label,
+        ).toEqual(contract.sections.map((item) => `${item.layout}:${item.media}`));
+      }
+    }
+  });
+
+  it('gives a page of several pictures several compositions', () => {
+    for (const direction of DIRECTION_IDS) {
+      for (const seed of SEEDS) {
+        const plan = planPresentation(proseSpec(), [], {
+          direction,
+          creative: { seed },
+          generatedAssetNeedIds: ['section-0', 'section-1', 'section-2', 'section-3'],
+        });
+
+        const led = plan.sections.filter((item) => isImageLed(item.layout));
+        const label = `${direction}/${seed}`;
+
+        expect(led.length, label).toBeGreaterThanOrEqual(3);
+        expect(new Set(led.map((item) => item.layout)).size, label).toBeGreaterThan(1);
+
+        /* No two image-led sections running consecutively share a treatment. */
+        plan.sections.forEach((item, index) => {
+          const previous = plan.sections[index - 1];
+
+          if (previous && isImageLed(item.layout) && isImageLed(previous.layout)) {
+            expect(`${label}#${index}: ${item.layout}`).not.toBe(`${label}#${index}: ${previous.layout}`);
+          }
+        });
+      }
+    }
+  });
+
+  it('keeps structured content in the arrangement its own shape earned', () => {
+    /*
+     * A list has a composition built for it. An image-led layout would flatten
+     * a mosaic or a ledger to a plain rail to make room for the picture, so a
+     * section carrying items or a Q&A keeps its own treatment and the image
+     * places beside or inside it instead.
+     */
+    for (const direction of DIRECTION_IDS) {
+      for (const seed of SEEDS) {
+        const plan = planPresentation(proseSpec(), [], {
+          direction,
+          creative: { seed },
+          generatedAssetNeedIds: ['section-4', 'section-5'],
+        });
+
+        for (const item of plan.sections.filter((entry) => entry.sourceIndex >= 4)) {
+          expect(item.media, `${direction}/${seed}`).not.toBe('none');
+          expect(['media-full-bleed', 'poster-frame', 'showcase-panel']).not.toContain(item.layout);
+        }
+      }
+    }
+  });
+});
+
+describe('a page without a picture is still a designed page', () => {
+  it('renders no image and still varies its compositions', () => {
+    for (const direction of DIRECTION_IDS) {
+      const { manifest, plan } = compilePageSpecToProjectManifest(proseSpec(), { direction });
+      const html = manifest.files['/index.html'] ?? '';
+
+      expect(html, direction).not.toContain('<img');
+      expect(html, direction).not.toContain('background-image');
+      expect(html, direction).toContain(proseSpec().page.headline);
+
+      /* Six beats, and never one treatment repeated across all of them. */
+      expect(new Set(plan.sections.map((item) => item.layout)).size, direction).toBeGreaterThan(2);
+    }
+  });
+
+  it('gives body-only prose more than one treatment across the design space', () => {
+    const observed = new Set<SectionLayout>();
+
+    for (const direction of DIRECTION_IDS) {
+      for (const seed of SEEDS) {
+        const plan = planPresentation(proseSpec(), [], { direction, creative: { seed } });
+
+        for (const item of plan.sections.filter((entry) => entry.sourceIndex <= 3)) {
+          observed.add(item.layout);
+        }
+      }
+    }
+
+    /*
+     * Deliberately a floor on range rather than a required layout: naming the
+     * treatments here would turn the vocabulary into a checklist and the next
+     * addition into a test failure.
+     */
+    expect(observed.size).toBeGreaterThan(4);
+  });
+});
+
+describe('every treatment holds the promises the document makes', () => {
+  /** Directions and seeds crossed with 0, 1, 3 and every-section imagery. */
+  function mediaDesigns() {
+    const results = [];
+
+    for (const direction of DIRECTION_IDS) {
+      for (const seed of ['a', 'b', 'c', 'd']) {
+        for (const indices of [[], [0], [0, 2, 3], [0, 1, 2, 3, 4, 5]]) {
+          results.push(
+            compilePageSpecToProjectManifest(proseSpec(), {
+              direction,
+              creative: { seed },
+              generatedMedia: generatedFor(indices),
+            }),
+          );
+        }
+      }
+    }
+
+    return results;
+  }
+
+  it('stays a single static page whatever the imagery budget', () => {
+    for (const { manifest, plan } of mediaDesigns()) {
+      const html = manifest.files['/index.html'] ?? '';
+      const label = `${plan.directionId}/${plan.design.seed}/${plan.imageEmphasis}`;
+
+      expect(occurrences(html, '<style'), label).toBe(1);
+      expect(html.includes(' style="'), label).toBe(false);
+      expect(html.includes(" style='"), label).toBe(false);
+      expect(html.includes('<script'), label).toBe(false);
+      expect(html.includes('javascript:'), label).toBe(false);
+    }
+  });
+
+  it('never drops or pads content to make a composition work', () => {
+    const spec = proseSpec();
+
+    for (const { manifest } of mediaDesigns()) {
+      const html = manifest.files['/index.html'] ?? '';
+
+      for (const source of spec.sections) {
+        if (source.heading) {
+          expect(html).toContain(source.heading);
+        }
+
+        /* One contiguous run: no treatment lifts a sentence out of the body. */
+        if (source.body) {
+          expect(occurrences(html, source.body)).toBe(1);
+        }
+
+        for (const item of source.items ?? []) {
+          expect(html).toContain(item);
+        }
+
+        for (const pair of source.qa ?? []) {
+          expect(html).toContain(pair.question);
+          expect(html).toContain(pair.answer);
+        }
+      }
+    }
+  });
+
+  it('renders every supplied picture exactly once', () => {
+    for (const { manifest } of mediaDesigns()) {
+      const html = manifest.files['/index.html'] ?? '';
+
+      for (const asset of generatedFor([0, 1, 2, 3, 4, 5])) {
+        const used = occurrences(html, asset.url);
+
+        expect(used === 0 || used === 1).toBe(true);
+      }
+    }
+  });
+
+  it('keeps a generated media URL out of the stylesheet in every treatment', () => {
+    for (const { manifest } of mediaDesigns()) {
+      const html = manifest.files['/index.html'] ?? '';
+      const stylesheet = html.slice(html.indexOf('<style'), html.indexOf('</style>'));
+
+      expect(stylesheet).not.toContain('/ithinq/generated/');
+      expect(stylesheet).not.toContain('url(/');
+      expect(stylesheet).not.toContain('url(//');
+    }
+  });
+});
+
+describe('text drawn on a photograph is legible by measurement', () => {
+  /**
+   * The scrim is the only place on the page where the background is unknown
+   * at build time. White is the brightest pixel a picture can contain, so the
+   * emitted veil is flattened against white — the worst case — and the ink
+   * that actually sits on it is measured against that.
+   */
+  function scrimAlpha(html: string, name: string): number {
+    const match = new RegExp(`--${name}:rgba\\((\\d+), (\\d+), (\\d+), ([0-9.]+)\\)`).exec(html);
+
+    expect(match, `${name} token missing`).not.toBeNull();
+
+    return Number(match![4]);
+  }
+
+  it('resolves the veil against the brightest picture that could arrive', () => {
+    for (const { manifest, plan } of designs()) {
+      const html = manifest.files['/index.html'] ?? '';
+      const { inverse, inverseInk } = plan.design.palette;
+      const weak = scrimAlpha(html, 'scrim-weak');
+      const strong = scrimAlpha(html, 'scrim-strong');
+      const label = `${plan.directionId}/${plan.design.seed}`;
+
+      expect(strong, label).toBeGreaterThanOrEqual(weak);
+      expect(contrastHex(inverseInk, composite(inverse, weak, '#ffffff')), label).toBeGreaterThanOrEqual(4.5);
+      expect(contrastHex(inverseInk, composite(inverse, strong, '#ffffff')), label).toBeGreaterThanOrEqual(4.5);
+
+      /* And over the darkest, where the veil barely matters. */
+      expect(contrastHex(inverseInk, composite(inverse, weak, '#000000')), label).toBeGreaterThanOrEqual(4.5);
+    }
+  });
+
+  it('draws a poster and a field hero on that veil, not on the bare picture', () => {
+    for (const direction of DIRECTION_IDS) {
+      for (const seed of SEEDS) {
+        const html = compilePageSpecToProjectManifest(proseSpec(), {
+          direction,
+          creative: { seed },
+          generatedMedia: [
+            { assetNeedId: 'hero', url: '/ithinq/generated/hero', alt: 'A reception desk' },
+            ...generatedFor([0, 1, 2, 3]),
+          ],
+        }).manifest.files['/index.html'] as string;
+
+        /* The rendered document only — the stylesheet names these selectors too. */
+        const body = html.slice(html.indexOf('</style>'));
+        const label = `${direction}/${seed}`;
+
+        expect(occurrences(body, 'poster__veil'), label).toBe(occurrences(body, 'media-poster'));
+        expect(occurrences(body, 'hero__veil'), label).toBe(occurrences(body, 'data-hero="full-bleed-media"'));
+      }
+    }
+  });
+
+  it('keeps the panelled treatments on a ground the palette already proves', () => {
+    for (const { plan } of designs()) {
+      const { paper, surface, surfaceAlt, accentSoft, ink, inkMuted, inverse, inverseInk } = plan.design.palette;
+      const label = `${plan.directionId}/${plan.design.seed}`;
+
+      /* The plate a display statement is drawn over. */
+      expect(contrastHex(ink, accentSoft), `ink on accent-soft (${label})`).toBeGreaterThanOrEqual(7);
+      expect(contrastHex(inkMuted, accentSoft), `muted ink on accent-soft (${label})`).toBeGreaterThanOrEqual(4.5);
+
+      /* The showcase plate, light and dark. */
+      for (const ground of [surface, paper, surfaceAlt]) {
+        expect(contrastHex(ink, ground), `ink on ${ground} (${label})`).toBeGreaterThanOrEqual(7);
+      }
+
+      expect(contrastHex(inverseInk, inverse), `inverse ink (${label})`).toBeGreaterThanOrEqual(7);
+    }
   });
 });
