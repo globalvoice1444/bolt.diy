@@ -1,80 +1,98 @@
 import type {
+  BackgroundTreatment,
   Band,
   CardStyle,
   ContentWidth,
   CtaTreatment,
   Density,
   DirectionId,
+  FamilyKey,
   HeroVariant,
+  ImageTreatment,
+  Motif,
   MotionLevel,
   SectionLayout,
 } from './types';
 
 /**
- * Design tokens for one direction.
+ * The system font stacks.
  *
- * Emitted as CSS custom properties. The base stylesheet is written against
- * these properties, so a direction changes the page's entire visual system
- * without needing its own copy of the layout rules.
+ * The compiled document is served under a Content-Security-Policy with no
+ * `font-src`, so a webfont would not merely be slow — it would be blocked, and
+ * the page would silently fall back to whatever the device happened to have.
+ * Premium typography here is bought with scale, weight, tracking, case,
+ * measure and a considered serif/sans pairing, not with a font file.
+ */
+export const FAMILY_STACKS: Readonly<Record<FamilyKey, string>> = {
+  serif: "ui-serif, Georgia, 'Iowan Old Style', 'Palatino Linotype', Palatino, 'Times New Roman', serif",
+  sans: "ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif",
+  geometric: "'Segoe UI', ui-sans-serif, system-ui, -apple-system, Roboto, 'Helvetica Neue', Arial, sans-serif",
+  humanist:
+    "'Optima', 'Gill Sans', 'Gill Sans MT', Candara, 'Trebuchet MS', ui-sans-serif, system-ui, Helvetica, sans-serif",
+  mono: "ui-monospace, SFMono-Regular, 'SF Mono', Menlo, Consolas, 'Liberation Mono', monospace",
+};
+
+/**
+ * Where generation starts for one archetype.
+ *
+ * These are anchors, not values. The synthesiser reads them, applies the
+ * page's own seed and the caller's creative intent, and lands somewhere near
+ * — never exactly on — the anchor. That is the difference between four
+ * starting points and four templates.
  */
 export interface DesignTokens {
-  paper: string;
-  surface: string;
-  surfaceAlt: string;
-  ink: string;
-  inkMuted: string;
-  line: string;
-  accent: string;
+  /** Accent hue anchor, in degrees, and how far the seed may drift it. */
+  hue: number;
+  hueSpread: number;
 
-  /** Accent used as a fill behind `accentInk`. */
-  accentInk: string;
+  /** Neutral (paper and ink) hue and how much colour the neutrals carry. */
+  neutralHue: number;
+  neutralChroma: number;
 
-  /**
-   * Accent for text on a light surface.
-   *
-   * A fill accent and a text accent cannot be the same value and still clear
-   * WCAG AA: the fill only needs 3:1 behind large text, the text itself needs
-   * 4.5:1. Kept as separate tokens rather than one accent used for both.
-   */
-  accentText: string;
+  accentSaturation: number;
+  accentLightness: number;
 
-  /** Accent for text on an inverted (dark) band, where the fill accent is too dark. */
-  accentOnDark: string;
-  inverse: string;
-  inverseInk: string;
-  inverseMuted: string;
-  displayFamily: string;
-  bodyFamily: string;
-  displayWeight: string;
-  displayTracking: string;
-  displayLeading: string;
-  eyebrowTransform: string;
-  eyebrowTracking: string;
-  radius: string;
-  radiusLarge: string;
-  border: string;
-  measure: string;
-  heroMinHeight: string;
+  /** Ink lightness anchor. Lower is a harder, higher-contrast page. */
+  inkLightness: number;
 
-  /** Multiplies the vertical rhythm; density widens or tightens it further. */
-  rhythm: string;
+  displayFamily: FamilyKey;
+  bodyFamily: FamilyKey;
+  scale: number;
+  displayWeight: number;
+  displayTracking: number;
+  displayLeading: number;
+  eyebrowUppercase: boolean;
+  eyebrowTracking: number;
+  measure: number;
+
+  rhythm: number;
+  radius: number;
+  border: number;
+  container: number;
+  heroMinHeight: number;
+
+  background: BackgroundTreatment;
+  motif: Motif;
+  image: ImageTreatment;
+  intensity: number;
 }
 
 /**
- * How a direction composes a page.
+ * How an archetype composes a page.
  *
- * Declarative on purpose. The planner reads these preferences and intersects
- * them with what each section actually contains, so one direction still
- * produces different compositions for different documents. There is no
- * `if (direction === x) renderTemplateX` anywhere in the renderer.
+ * Declarative on purpose. The planner reads these preferences, intersects them
+ * with what each section actually contains, and reorders them against the
+ * seed, so one archetype still produces different compositions for different
+ * documents and different seeds. There is no `if (direction === x) renderX`
+ * anywhere in the renderer.
  */
 export interface CompositionPolicy {
   /** Preference order. The first variant whose media requirement is met wins. */
   heroVariants: readonly HeroVariant[];
   contentWidth: ContentWidth;
 
-  /** Cycles across sections to build background rhythm. */
-  bandCycle: readonly Band[];
+  /** Bands this archetype is willing to use. The rhythm generator draws here. */
+  bandPalette: readonly Band[];
 
   /** Start a new visual chapter every N sections. Null disables chapters. */
   chapterEvery: number | null;
@@ -97,70 +115,66 @@ export interface CreativeDirection {
   id: DirectionId;
   label: string;
   summary: string;
+
+  /** Generation anchors, not final values. */
   tokens: DesignTokens;
   composition: CompositionPolicy;
 
-  /** Structural CSS unique to this direction, layered over the base sheet. */
+  /** Structural CSS unique to this archetype, layered over the base sheet. */
   signatureCss: string;
 }
-
-const SERIF = "ui-serif, Georgia, 'Iowan Old Style', 'Palatino Linotype', Palatino, 'Times New Roman', serif";
-const SANS =
-  "ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif";
-const GEOMETRIC = "'Segoe UI', ui-sans-serif, system-ui, -apple-system, Roboto, 'Helvetica Neue', Arial, sans-serif";
 
 /**
  * PREMIUM EDITORIAL — magazine pacing.
  *
- * Serif display at large scale, warm paper, generous whitespace, alternating
- * asymmetric splits, restrained CTAs. Proof lives in typography, not in boxes.
+ * Serif display at large scale, warm paper, generous whitespace, asymmetric
+ * splits, restrained calls to action. Proof lives in typography, not in boxes.
  */
 const editorialLuxe: CreativeDirection = {
   id: 'editorial-luxe',
   label: 'Premium editorial',
   summary: 'Serif display, warm paper, asymmetric editorial pacing and restrained calls to action.',
   tokens: {
-    paper: '#faf7f2',
-    surface: '#fffdfa',
-    surfaceAlt: '#f2ece2',
-    ink: '#1b1815',
-    inkMuted: '#5f574d',
-    line: 'rgba(27, 24, 21, 0.14)',
-    accent: '#9a7433',
-    accentInk: '#1b1815',
-    accentText: '#7a5a24',
-    accentOnDark: '#d4ad63',
-    inverse: '#1b1815',
-    inverseInk: '#faf7f2',
-    inverseMuted: 'rgba(250, 247, 242, 0.72)',
-    displayFamily: SERIF,
-    bodyFamily: SERIF,
-    displayWeight: '500',
-    displayTracking: '-0.022em',
-    displayLeading: '1.04',
-    eyebrowTransform: 'uppercase',
-    eyebrowTracking: '0.22em',
-    radius: '2px',
-    radiusLarge: '4px',
-    border: '1px',
-    measure: '64ch',
-    heroMinHeight: '82vh',
-    rhythm: '1.25',
+    hue: 38,
+    hueSpread: 26,
+    neutralHue: 36,
+    neutralChroma: 16,
+    accentSaturation: 50,
+    accentLightness: 40,
+    inkLightness: 10,
+    displayFamily: 'serif',
+    bodyFamily: 'serif',
+    scale: 1.28,
+    displayWeight: 500,
+    displayTracking: -0.022,
+    displayLeading: 1.04,
+    eyebrowUppercase: true,
+    eyebrowTracking: 0.22,
+    measure: 64,
+    rhythm: 1.25,
+    radius: 2,
+    border: 1,
+    container: 1240,
+    heroMinHeight: 82,
+    background: 'wash',
+    motif: 'index',
+    image: 'soft-mask',
+    intensity: 0.4,
   },
   composition: {
-    heroVariants: ['split-media', 'editorial-stack'],
+    heroVariants: ['split-media', 'editorial-stack', 'asymmetric-offset'],
     contentWidth: 'narrow',
-    bandCycle: ['base', 'base', 'tint'],
+    bandPalette: ['base', 'base', 'tint', 'wash', 'deep'],
     chapterEvery: 3,
     alternate: true,
     layoutPreferences: {
-      interrupt: ['pull-quote', 'editorial-prose'],
-      scenario: ['editorial-split', 'editorial-prose'],
-      pain: ['pull-quote', 'editorial-prose'],
-      mechanism: ['editorial-split', 'numbered-flow', 'editorial-prose'],
-      vertical_fit: ['feature-rail', 'editorial-prose'],
+      interrupt: ['manifesto', 'pull-quote', 'editorial-prose'],
+      scenario: ['offset-editorial', 'editorial-split', 'editorial-prose'],
+      pain: ['quote-panel', 'pull-quote', 'editorial-prose'],
+      mechanism: ['editorial-split', 'ledger', 'numbered-flow', 'editorial-prose'],
+      vertical_fit: ['ledger', 'feature-rail', 'editorial-prose'],
       faq: ['qa-two-column', 'accordion'],
-      risk: ['cards', 'editorial-prose'],
+      risk: ['stat-band', 'cards', 'editorial-prose'],
       default: ['editorial-prose'],
     },
     cardStyle: 'flat',
@@ -170,68 +184,68 @@ const editorialLuxe: CreativeDirection = {
     promoteLeadSections: true,
   },
   signatureCss: `
-[data-direction='editorial-luxe'] h1{font-style:normal}
 [data-direction='editorial-luxe'] .eyebrow::after{content:'';display:block;width:36px;height:1px;background:var(--accent);margin-top:12px}
-[data-direction='editorial-luxe'] .section-heading{max-width:18ch}
-[data-direction='editorial-luxe'] .prose--long > p:first-of-type::first-letter{float:left;font-size:3.1em;line-height:.82;padding:.06em .09em 0 0;color:var(--accent)}
-[data-direction='editorial-luxe'] .band-rule{border-top:1px solid var(--line)}
-[data-direction='editorial-luxe'] .button--primary{border-radius:2px;border:1px solid var(--ink);background:transparent;color:var(--ink)}
+[data-direction='editorial-luxe'] .section-heading{max-width:19ch}
+[data-direction='editorial-luxe'] .prose--long > p:first-of-type::first-letter{float:left;font-size:3.1em;line-height:.82;padding:.06em .09em 0 0;color:var(--accent-text)}
+[data-direction='editorial-luxe'] .button--primary{background:transparent;color:var(--ink);border-color:var(--ink)}
 [data-direction='editorial-luxe'] .button--primary:hover{background:var(--ink);color:var(--paper)}
+[data-direction='editorial-luxe'] [data-ground='dark'] .button--primary{color:var(--inverse-ink);border-color:var(--inverse-ink)}
+[data-direction='editorial-luxe'] [data-ground='dark'] .button--primary:hover{background:var(--inverse-ink);color:var(--inverse)}
+[data-direction='editorial-luxe'] [data-ground='accent'] .button--primary{background:var(--accent-ink);color:var(--accent);border-color:var(--accent-ink)}
 `,
 };
 
 /**
  * MODERN CONVERSION — premium SaaS.
  *
- * Crisp neutral surfaces, structured cards, clear hierarchy, a banner CTA and
- * a mechanism presented as an explicit numbered flow.
+ * Crisp neutral surfaces, structured cards and mosaics, clear hierarchy, a
+ * prominent call to action and a mechanism presented as an explicit flow.
  */
 const conversionModern: CreativeDirection = {
   id: 'conversion-modern',
   label: 'Modern conversion',
-  summary: 'Crisp light surfaces, elevated white cards, structured hierarchy and a prominent banner call to action.',
+  summary: 'Crisp light surfaces, structured cards and mosaics, decisive hierarchy and a prominent call to action.',
   tokens: {
-    paper: '#ffffff',
-    surface: '#ffffff',
-    surfaceAlt: '#f4f6fb',
-    ink: '#0f172a',
-    inkMuted: '#51607a',
-    line: 'rgba(15, 23, 42, 0.12)',
-    accent: '#4f46e5',
-    accentInk: '#ffffff',
-    accentText: '#3730a3',
-    accentOnDark: '#a5b4fc',
-    inverse: '#0f172a',
-    inverseInk: '#f8fafc',
-    inverseMuted: 'rgba(248, 250, 252, 0.74)',
-    displayFamily: SANS,
-    bodyFamily: SANS,
-    displayWeight: '700',
-    displayTracking: '-0.035em',
-    displayLeading: '1.06',
-    eyebrowTransform: 'uppercase',
-    eyebrowTracking: '0.14em',
-    radius: '12px',
-    radiusLarge: '24px',
-    border: '1px',
-    measure: '68ch',
-    heroMinHeight: '76vh',
-    rhythm: '1',
+    hue: 248,
+    hueSpread: 44,
+    neutralHue: 224,
+    neutralChroma: 14,
+    accentSaturation: 72,
+    accentLightness: 58,
+    inkLightness: 12,
+    displayFamily: 'sans',
+    bodyFamily: 'sans',
+    scale: 1.32,
+    displayWeight: 700,
+    displayTracking: -0.035,
+    displayLeading: 1.06,
+    eyebrowUppercase: true,
+    eyebrowTracking: 0.14,
+    measure: 68,
+    rhythm: 1,
+    radius: 12,
+    border: 1,
+    container: 1240,
+    heroMinHeight: 76,
+    background: 'aurora',
+    motif: 'none',
+    image: 'plate',
+    intensity: 0.55,
   },
   composition: {
-    heroVariants: ['split-media', 'offset-panel'],
+    heroVariants: ['split-media', 'offset-panel', 'framed-plate'],
     contentWidth: 'wide',
-    bandCycle: ['base', 'raised'],
+    bandPalette: ['base', 'raised', 'wash', 'tint', 'deep'],
     chapterEvery: null,
     alternate: true,
     layoutPreferences: {
-      interrupt: ['editorial-split', 'editorial-prose'],
-      scenario: ['editorial-split', 'editorial-prose'],
-      pain: ['cards', 'editorial-prose'],
-      mechanism: ['numbered-flow', 'editorial-split'],
-      vertical_fit: ['cards', 'comparison-grid', 'feature-rail'],
+      interrupt: ['manifesto', 'editorial-split', 'editorial-prose'],
+      scenario: ['offset-editorial', 'editorial-split', 'editorial-prose'],
+      pain: ['stat-band', 'cards', 'editorial-prose'],
+      mechanism: ['numbered-flow', 'ledger', 'editorial-split'],
+      vertical_fit: ['bento-mosaic', 'cards', 'comparison-grid', 'feature-rail'],
       faq: ['accordion', 'qa-two-column'],
-      risk: ['cards', 'editorial-prose'],
+      risk: ['cards', 'stat-band', 'editorial-prose'],
       default: ['editorial-prose'],
     },
     cardStyle: 'elevated',
@@ -242,65 +256,64 @@ const conversionModern: CreativeDirection = {
   },
   signatureCss: `
 [data-direction='conversion-modern'] .eyebrow{color:var(--accent-text)}
-[data-direction='conversion-modern'] .hero:not(.band-inverted){background:linear-gradient(180deg,var(--surface-alt),var(--paper))}
-[data-direction='conversion-modern'] .card{box-shadow:0 1px 2px rgba(15,23,42,.06),0 12px 32px rgba(15,23,42,.07)}
-[data-direction='conversion-modern'] .flow-step__index{background:var(--accent);color:var(--accent-ink);border-radius:999px}
-[data-direction='conversion-modern'] .section-heading em{font-style:normal;box-shadow:inset 0 -0.32em 0 color-mix(in srgb, var(--accent) 22%, transparent)}
+[data-direction='conversion-modern'] [data-ground='dark'] .eyebrow{color:var(--accent-on-dark)}
+[data-direction='conversion-modern'] .flow-step__index{background:var(--accent);color:var(--accent-ink);border-color:transparent;border-radius:999px}
+[data-direction='conversion-modern'] .stat__value{color:var(--accent-text)}
+[data-direction='conversion-modern'] [data-ground='dark'] .stat__value{color:var(--accent-on-dark)}
 `,
 };
 
 /**
  * BOLD SERVICE — high-contrast local service.
  *
- * Inverted hero panel, heavy uppercase display, dense scannable rails and a
- * split CTA that stays reachable on small screens.
+ * Inverted panels, heavy display type, dense scannable rails and a split call
+ * to action that stays reachable on small screens.
  */
 const serviceBold: CreativeDirection = {
   id: 'service-bold',
   label: 'Bold service',
-  summary: 'Inverted high-contrast panels, heavy uppercase display, scannable rails and an assertive split CTA.',
+  summary: 'Inverted high-contrast panels, heavy display type, scannable rails and an assertive split call to action.',
   tokens: {
-    paper: '#f4f5f7',
-    surface: '#ffffff',
-    surfaceAlt: '#e7e9ee',
-    ink: '#0b0f14',
-    inkMuted: '#4b5563',
-    line: 'rgba(11, 15, 20, 0.16)',
-    accent: '#f4511e',
-    accentInk: '#0b0f14',
-    accentText: '#a83512',
-    accentOnDark: '#ff8a5c',
-    inverse: '#0b0f14',
-    inverseInk: '#ffffff',
-    inverseMuted: 'rgba(255, 255, 255, 0.72)',
-    displayFamily: GEOMETRIC,
-    bodyFamily: GEOMETRIC,
-    displayWeight: '800',
-    displayTracking: '-0.028em',
-    displayLeading: '0.98',
-    eyebrowTransform: 'uppercase',
-    eyebrowTracking: '0.16em',
-    radius: '6px',
-    radiusLarge: '10px',
-    border: '2px',
-    measure: '60ch',
-    heroMinHeight: '70vh',
-    rhythm: '0.85',
+    hue: 18,
+    hueSpread: 30,
+    neutralHue: 214,
+    neutralChroma: 8,
+    accentSaturation: 88,
+    accentLightness: 52,
+    inkLightness: 6,
+    displayFamily: 'geometric',
+    bodyFamily: 'geometric',
+    scale: 1.34,
+    displayWeight: 800,
+    displayTracking: -0.028,
+    displayLeading: 0.98,
+    eyebrowUppercase: true,
+    eyebrowTracking: 0.16,
+    measure: 60,
+    rhythm: 0.85,
+    radius: 6,
+    border: 2,
+    container: 1280,
+    heroMinHeight: 70,
+    background: 'ruled',
+    motif: 'ticks',
+    image: 'duotone',
+    intensity: 0.8,
   },
   composition: {
-    heroVariants: ['offset-panel', 'centered-statement', 'full-bleed-media'],
+    heroVariants: ['offset-panel', 'centered-statement', 'full-bleed-media', 'asymmetric-offset'],
     contentWidth: 'wide',
-    bandCycle: ['inverted', 'base', 'accent', 'base'],
+    bandPalette: ['inverted', 'base', 'accent', 'base', 'deep'],
     chapterEvery: null,
     alternate: false,
     layoutPreferences: {
-      interrupt: ['pull-quote', 'editorial-prose'],
-      scenario: ['editorial-split', 'editorial-prose'],
-      pain: ['pull-quote', 'feature-rail'],
-      mechanism: ['numbered-flow', 'editorial-split'],
-      vertical_fit: ['cards', 'feature-rail'],
+      interrupt: ['manifesto', 'quote-panel', 'editorial-prose'],
+      scenario: ['offset-editorial', 'editorial-split', 'editorial-prose'],
+      pain: ['stat-band', 'quote-panel', 'feature-rail'],
+      mechanism: ['numbered-flow', 'ledger', 'editorial-split'],
+      vertical_fit: ['bento-mosaic', 'cards', 'feature-rail'],
       faq: ['accordion'],
-      risk: ['feature-rail', 'editorial-prose'],
+      risk: ['feature-rail', 'stat-band', 'editorial-prose'],
       default: ['editorial-prose'],
     },
     cardStyle: 'inverted',
@@ -311,11 +324,11 @@ const serviceBold: CreativeDirection = {
   },
   signatureCss: `
 [data-direction='service-bold'] h1,[data-direction='service-bold'] .section-heading{text-transform:uppercase}
-[data-direction='service-bold'] .button{text-transform:uppercase;letter-spacing:.04em;border-radius:6px}
-[data-direction='service-bold'] .button--primary{box-shadow:0 4px 0 color-mix(in srgb, var(--accent) 62%, #000)}
-[data-direction='service-bold'] .button--primary:active{transform:translateY(2px);box-shadow:0 2px 0 color-mix(in srgb, var(--accent) 62%, #000)}
-[data-direction='service-bold'] .eyebrow{color:var(--accent-text)}
+[data-direction='service-bold'] .button{text-transform:uppercase;letter-spacing:.04em}
+[data-direction='service-bold'] .button--primary{box-shadow:0 4px 0 var(--accent-shadow)}
+[data-direction='service-bold'] .button--primary:active{transform:translateY(2px);box-shadow:0 2px 0 var(--accent-shadow)}
 [data-direction='service-bold'] .rail__item{border-left:4px solid var(--accent)}
+[data-direction='service-bold'] .stat{border-top-width:4px}
 `,
 };
 
@@ -330,47 +343,46 @@ const clinicalCalm: CreativeDirection = {
   label: 'Clinical calm',
   summary: 'Soft cool surfaces, centred statement hero, rounded outlined cards and an unhurried reading rhythm.',
   tokens: {
-    paper: '#f6f9fa',
-    surface: '#ffffff',
-    surfaceAlt: '#e8f1f2',
-    ink: '#12283a',
-    inkMuted: '#537083',
-    line: 'rgba(18, 40, 58, 0.12)',
-    accent: '#1f6f6a',
-    accentInk: '#ffffff',
-    accentText: '#175450',
-    accentOnDark: '#7fd3cb',
-    inverse: '#12283a',
-    inverseInk: '#f6f9fa',
-    inverseMuted: 'rgba(246, 249, 250, 0.76)',
-    displayFamily: SANS,
-    bodyFamily: SANS,
-    displayWeight: '600',
-    displayTracking: '-0.024em',
-    displayLeading: '1.1',
-    eyebrowTransform: 'uppercase',
-    eyebrowTracking: '0.18em',
-    radius: '18px',
-    radiusLarge: '32px',
-    border: '1px',
-    measure: '66ch',
-    heroMinHeight: '72vh',
-    rhythm: '1.15',
+    hue: 176,
+    hueSpread: 46,
+    neutralHue: 198,
+    neutralChroma: 12,
+    accentSaturation: 56,
+    accentLightness: 40,
+    inkLightness: 14,
+    displayFamily: 'sans',
+    bodyFamily: 'sans',
+    scale: 1.26,
+    displayWeight: 600,
+    displayTracking: -0.024,
+    displayLeading: 1.1,
+    eyebrowUppercase: true,
+    eyebrowTracking: 0.18,
+    measure: 66,
+    rhythm: 1.15,
+    radius: 18,
+    border: 1,
+    container: 1200,
+    heroMinHeight: 72,
+    background: 'aurora',
+    motif: 'none',
+    image: 'soft-mask',
+    intensity: 0.35,
   },
   composition: {
-    heroVariants: ['centered-statement', 'split-media'],
+    heroVariants: ['centered-statement', 'split-media', 'framed-plate'],
     contentWidth: 'narrow',
-    bandCycle: ['base', 'tint', 'base', 'raised'],
+    bandPalette: ['base', 'tint', 'base', 'wash', 'raised', 'deep'],
     chapterEvery: 4,
     alternate: true,
     layoutPreferences: {
-      interrupt: ['editorial-prose'],
-      scenario: ['editorial-prose', 'editorial-split'],
-      pain: ['editorial-prose', 'pull-quote'],
-      mechanism: ['numbered-flow', 'editorial-split'],
-      vertical_fit: ['feature-rail', 'cards'],
+      interrupt: ['manifesto', 'editorial-prose'],
+      scenario: ['editorial-prose', 'offset-editorial', 'editorial-split'],
+      pain: ['editorial-prose', 'quote-panel', 'pull-quote'],
+      mechanism: ['numbered-flow', 'ledger', 'editorial-split'],
+      vertical_fit: ['feature-rail', 'bento-mosaic', 'cards'],
       faq: ['qa-two-column', 'accordion'],
-      risk: ['editorial-prose'],
+      risk: ['stat-band', 'editorial-prose'],
       default: ['editorial-prose'],
     },
     cardStyle: 'outlined',
@@ -385,7 +397,9 @@ const clinicalCalm: CreativeDirection = {
 [data-direction='clinical-calm'] .hero[data-hero='centered-statement'] .measure{margin-inline:auto}
 [data-direction='clinical-calm'] .card{border-radius:var(--radius-large)}
 [data-direction='clinical-calm'] .eyebrow{color:var(--accent-text)}
+[data-direction='clinical-calm'] [data-ground='dark'] .eyebrow{color:var(--accent-on-dark)}
 [data-direction='clinical-calm'] .rail__item{border-radius:var(--radius-large);background:var(--surface);border-top:0;padding:18px 22px}
+[data-direction='clinical-calm'] [data-ground='dark'] .rail__item{background:var(--veil-soft)}
 `,
 };
 

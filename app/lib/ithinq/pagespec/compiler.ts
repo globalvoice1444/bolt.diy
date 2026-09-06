@@ -6,12 +6,13 @@ import {
   type CreativePresentationPlan,
   type CopyText,
   type GeneratedMedia,
+  type PageCreativeIntent,
   type PlanOptions,
 } from './creative';
 import type { ProjectManifest } from './runtime';
 import { requireValidPageSpec, type PageSpecValidationOptions } from './validator';
 
-export const PAGESPEC_COMPILER_VERSION = 'ithinq-pagespec-renderer/0.2.0';
+export const PAGESPEC_COMPILER_VERSION = 'ithinq-pagespec-renderer/0.3.0';
 export const PAGESPEC_CONTRACT_SOURCE =
   'globalvoice1444/ithinq-partner-network@51c103ff2492b068095dc356225d5d9ef496b44b';
 
@@ -32,6 +33,8 @@ export interface CompilePageSpecOptions extends PageSpecValidationOptions, PlanO
    */
   copy?: CopyText;
 }
+
+export type { PageCreativeIntent };
 
 export interface CompilePageSpecResult {
   manifest: ProjectManifest;
@@ -66,6 +69,9 @@ export function canonicalJson(value: unknown): string {
  * decides how the page looks; the PageSpec remains the only source of what it
  * says. No LLM, provider, prompt, shell, eval, WebContainer or network read is
  * involved, and the same input always produces byte-identical output.
+ *
+ * Creative direction and creative intent are presentation inputs and travel in
+ * the options, never in the document. The vendored contract stays at 1.0.
  */
 export function compilePageSpecToProjectManifest(
   input: unknown,
@@ -87,6 +93,9 @@ export function compilePageSpecToProjectManifest(
     pageReference: spec.page.reference,
     direction: direction.id,
     directionLabel: direction.label,
+
+    /* Which point in the design space this page came out at, not its inputs. */
+    designSeed: plan.design.seed,
   };
 
   const manifest: ProjectManifest = {
