@@ -92,6 +92,27 @@ function accentSaturation(anchor: CreativeDirection['tokens'], rng: Rng, intent:
 }
 
 /**
+ * A tint that copy is drawn on, walked back until the copy clears AA.
+ *
+ * `accentSoft` is not decoration: the wash band, the quote panel and the
+ * display-statement plate all set text over it. A tint chosen by seed alone
+ * lands a few hundredths under 4.5 for the darker accents — a contrast
+ * failure no reviewer sees, because the colour was generated. The mix is
+ * reduced towards paper, never past it, until the muted body ink clears.
+ */
+function resolveSoftTint(paper: string, accent: string, weight: number, bodyInk: string): string {
+  for (let step = Math.round(weight * 100); step >= 0; step -= 1) {
+    const candidate = mix(paper, accent, step / 100);
+
+    if (contrastHex(bodyInk, candidate) >= AA_BODY) {
+      return candidate;
+    }
+  }
+
+  return paper;
+}
+
+/**
  * Build the palette, then prove it.
  *
  * Every role that carries text is walked to a measured ratio rather than
@@ -159,7 +180,7 @@ function buildPalette(anchor: CreativeDirection['tokens'], rng: Rng, intent: Nor
     accentInk,
     accentText,
     accentOnDark,
-    accentSoft: mix(paper, accent, round(clamp(0.06 + rng.range(0, 0.08), 0.05, 0.16))),
+    accentSoft: resolveSoftTint(paper, accent, round(clamp(0.06 + rng.range(0, 0.08), 0.05, 0.16)), inkMuted),
     inverse,
     inverseInk,
     inverseMuted: rgba(inverseInk, 0.74),
@@ -514,6 +535,13 @@ export function synthesiseComposition(
       policy.chapterEvery === null ? (rng.chance(0.3) ? 3 : null) : rng.chance(0.8) ? policy.chapterEvery : null,
     alternate: rng.chance(0.82) ? policy.alternate : !policy.alternate,
     layoutPreferences: varyPreferences(policy.layoutPreferences, rng),
+
+    /*
+     * The image-led list is reordered like any other preference list, but
+     * never trimmed: every entry has to survive so a page holding several
+     * pictures still has several compositions to rotate through.
+     */
+    mediaLayouts: policy.mediaLayouts.length > 1 ? biasedShuffle(policy.mediaLayouts, rng) : policy.mediaLayouts,
     cardStyle: rng.weighted(
       CARD_STYLES.map(
         (option) =>

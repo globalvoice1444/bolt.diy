@@ -1,4 +1,4 @@
-import { mix, rgba } from './colour';
+import { mix, resolveScrimAlpha, rgba } from './colour';
 import { FAMILY_STACKS, type CreativeDirection } from './directions';
 import type { CreativePresentationPlan, Density, MotionLevel, PageDesign } from './types';
 
@@ -49,8 +49,12 @@ function typeScale(design: PageDesign): Record<string, string> {
   };
 }
 
+/** Body text over an unknown photograph. AA, measured against white. */
+const AA_OVER_IMAGE = 4.6;
+
 function tokenBlock(design: PageDesign, density: Density): string {
   const { palette, typography, spatial, decoration } = design;
+  const scrim = resolveScrimAlpha(palette.inverse, palette.inverseInk, AA_OVER_IMAGE);
 
   const entries: Record<string, string> = {
     '--paper': palette.paper,
@@ -70,6 +74,18 @@ function tokenBlock(design: PageDesign, density: Density): string {
     '--inverse-ink': palette.inverseInk,
     '--inverse-muted': palette.inverseMuted,
     '--veil': rgba(palette.inverseInk, 0.1),
+
+    /*
+     * The scrim a poster's copy sits on, resolved rather than chosen.
+     *
+     * Text over generated imagery is the one place on the page where the
+     * background is unknown at build time. `resolveScrimAlpha` walks the veil
+     * up until it clears AA against the brightest picture that could arrive —
+     * white — so the floor holds for every photograph, and the sheet keeps as
+     * much of the image visible as that allows.
+     */
+    '--scrim-weak': rgba(palette.inverse, scrim),
+    '--scrim-strong': rgba(palette.inverse, Math.min(1, Number((scrim + 0.12).toFixed(2)))),
     '--veil-soft': rgba(palette.inverseInk, 0.06),
     '--veil-line': rgba(palette.inverseInk, 0.2),
     '--display-family': FAMILY_STACKS[typography.displayFamily],
@@ -273,7 +289,10 @@ h1{font-size:clamp(var(--size-h1-min),1.2rem + 5.4vw,var(--size-h1))}
 .hero[data-hero='framed-plate'] .hero__copy{background:var(--surface);border:var(--border) solid var(--line);
   border-radius:var(--radius-large);padding:clamp(26px,4vw,58px);box-shadow:0 24px 60px var(--accent-veil)}
 .hero[data-hero='full-bleed-media']{color:var(--inverse-ink);background:var(--inverse)}
-.hero[data-hero='full-bleed-media'] .hero__media{position:absolute;inset:0;opacity:.4;z-index:0}
+.hero[data-hero='full-bleed-media'] .hero__media{position:absolute;inset:0;z-index:0}
+.hero[data-hero='full-bleed-media'] .hero__veil{position:absolute;inset:0;z-index:0;pointer-events:none;
+  background:linear-gradient(to top,var(--scrim-strong) 0%,var(--scrim-strong) 30%,
+    var(--scrim-weak) 74%,var(--scrim-weak) 100%)}
 .hero[data-hero='full-bleed-media'] .hero__media img{width:100%;height:100%;object-fit:cover;border-radius:0}
 .hero[data-hero='full-bleed-media'] .hero__copy{position:relative;z-index:1}
 .hero__media img{width:100%;border-radius:var(--radius-large);aspect-ratio:4/5;object-fit:cover}
@@ -324,6 +343,108 @@ h1{font-size:clamp(var(--size-h1-min),1.2rem + 5.4vw,var(--size-h1))}
 [data-layout='offset-editorial'][data-mirrored='true'] .layout{direction:rtl}
 [data-layout='offset-editorial'][data-mirrored='true'] .layout > *{direction:ltr}
 [data-layout='offset-editorial'] .section-heading{max-width:14ch}
+
+/* ---- layout: display-statement -------------------------------------
+   Oversized type, no picture required. Most sections a generated
+   document carries are a heading and a paragraph, and three prose
+   treatments is not a design system. Here the heading is set at display
+   scale across the field and the copy hangs off it in a seeded column,
+   so a body-only beat reads as a composition rather than as a page of
+   text with a bigger heading. */
+[data-layout='display-statement'] .section__head{position:relative;margin-bottom:clamp(16px,2.2vw,30px)}
+[data-layout='display-statement'] .section-heading{
+  font-size:clamp(2rem,1.2rem + 4.2vw,calc(var(--size-h1) * .86));max-width:17ch}
+/* Faded rather than cut: a plate that stops mid-heading with a hard edge
+   reads as a highlight someone forgot to finish. */
+[data-layout='display-statement'] .section__head::after{content:'';position:absolute;z-index:-1;
+  inset:-8% 30% -14% -4%;border-radius:var(--radius-large);opacity:calc(var(--intensity) * .85);
+  background:linear-gradient(90deg,var(--accent-soft) 0%,var(--accent-soft) 42%,transparent 100%)}
+[data-ground='dark'] [data-layout='display-statement'] .section__head::after,
+[data-layout='display-statement'][data-ground='dark'] .section__head::after{
+  background:linear-gradient(90deg,var(--veil) 0%,var(--veil) 42%,transparent 100%)}
+[data-layout='display-statement'][data-ground='accent'] .section__head::after{display:none}
+[data-layout='display-statement'] .prose--statement{width:min(100%,var(--split,58%));max-width:none;
+  margin-inline-start:auto;border-top:var(--border) solid var(--line);padding-top:clamp(14px,1.8vw,26px)}
+[data-ground='dark'] [data-layout='display-statement'] .prose--statement,
+[data-layout='display-statement'][data-ground='dark'] .prose--statement{border-color:var(--veil-line)}
+[data-layout='display-statement'] .prose--statement .section-body{margin-top:0;max-width:none;
+  font-size:clamp(1.08rem,1rem + .7vw,var(--size-lede))}
+
+/* ---- layout: chapter-opener ----------------------------------------
+   A break in the page rather than another block on it: a hanging mark
+   and rule against copy set in a narrow measure. Costs no picture,
+   which is the point. */
+[data-layout='chapter-opener'] .chapter{display:grid;gap:clamp(20px,3.2vw,56px);align-items:start;
+  grid-template-columns:minmax(0,var(--split,30%)) minmax(0,1fr)}
+[data-layout='chapter-opener'] .chapter__mark{border-top:2px solid var(--accent);padding-top:14px}
+[data-layout='chapter-opener'] .chapter__numeral{display:block;font-family:var(--display-family);
+  font-weight:var(--display-weight);letter-spacing:var(--display-tracking);line-height:.92;
+  font-size:clamp(3rem,2rem + 5vw,calc(var(--size-h1) * .72));color:var(--accent-text)}
+[data-ground='dark'] .chapter__numeral{color:var(--accent-on-dark)}
+[data-ground='dark'] .chapter__mark{border-color:var(--accent-on-dark)}
+[data-ground='accent'] .chapter__numeral{color:currentColor}
+[data-ground='accent'] .chapter__mark{border-color:currentColor}
+[data-layout='chapter-opener'] .section__head{margin-bottom:clamp(12px,1.6vw,22px)}
+[data-layout='chapter-opener'] .section-heading{max-width:20ch}
+
+/* ---- layout: column-essay ------------------------------------------
+   A long passage set in columns. CSS does the columns, so the body
+   stays one contiguous run of text: nothing is split, reordered or
+   duplicated to make the shape work. The column count collapses on its
+   own once the measure no longer fits twice. */
+[data-layout='column-essay'] .prose--columns{max-width:min(100%,calc(var(--measure) * 1.55));
+  columns:28ch 2;column-gap:clamp(28px,4vw,64px);column-rule:1px solid var(--line)}
+[data-ground='dark'] .prose--columns{column-rule-color:var(--veil-line)}
+[data-layout='column-essay'] .prose--columns .section-body{margin-top:0;max-width:none}
+[data-layout='column-essay'] .section__head{margin-bottom:clamp(18px,2.4vw,34px)}
+
+/* ---- layout: poster-frame ------------------------------------------
+   The picture is the field and a short statement sits low in it. Text
+   over a photograph is legible only because of the scrim, so the scrim
+   is a real element with a resolved floor alpha rather than a hopeful
+   one, and it never reaches full transparency anywhere copy can land.
+   It is its own element because the section and the figure have both
+   already spent their pseudo-elements on background and image
+   treatments. */
+[data-layout='poster-frame']{display:grid;align-items:end;min-height:min(68vh,660px);
+  background:var(--inverse);padding-block:clamp(44px,6vw,104px)}
+[data-layout='poster-frame'] .media-poster{position:absolute;inset:0;z-index:0}
+[data-layout='poster-frame'] .media-poster img{width:100%;height:100%;object-fit:cover;border-radius:0}
+.poster__veil{position:absolute;inset:0;z-index:0;pointer-events:none;
+  background:linear-gradient(to top,var(--scrim-strong) 0%,var(--scrim-strong) 34%,
+    var(--scrim-weak) 76%,var(--scrim-weak) 100%)}
+/* Everything on the picture is set in one ink.
+   The scrim is resolved for exactly one foreground colour, so a muted grey or
+   an accent drawn on top of it would be a contrast claim nothing measured. */
+[data-layout='poster-frame'] .poster__copy{position:relative;z-index:1;color:var(--inverse-ink)}
+[data-layout='poster-frame'] .poster__copy .eyebrow,
+[data-layout='poster-frame'] .poster__copy .index-mark,
+[data-layout='poster-frame'] .poster__copy .section-body,
+.hero[data-hero='full-bleed-media'] .hero__copy,
+.hero[data-hero='full-bleed-media'] .eyebrow,
+.hero[data-hero='full-bleed-media'] .lede,
+.hero[data-hero='full-bleed-media'] .introduction{color:var(--inverse-ink)}
+[data-layout='poster-frame'] .section-heading{
+  font-size:clamp(2rem,1.2rem + 4vw,calc(var(--size-h1) * .82));max-width:18ch}
+[data-layout='poster-frame'] .section-body{font-size:clamp(1.06rem,1rem + .6vw,var(--size-lede))}
+
+/* ---- layout: showcase-panel ----------------------------------------
+   A layered composition: the picture runs wide and the copy sits on its
+   own plate overlapping it. The plate brings its own ground, so copy is
+   never set over the image itself. */
+[data-layout='showcase-panel'] .showcase{display:grid;
+  grid-template-columns:repeat(12,minmax(0,1fr));align-items:center}
+[data-layout='showcase-panel'] .showcase__media{grid-area:1/1/2/10}
+[data-layout='showcase-panel'] .showcase__media img{width:100%;aspect-ratio:16/10;object-fit:cover;
+  border-radius:var(--radius-large)}
+[data-layout='showcase-panel'] .showcase__copy{grid-area:1/7/2/13;z-index:1;background:var(--surface);
+  border:var(--border) solid var(--line);border-radius:var(--radius-large);
+  padding:clamp(22px,3.2vw,46px);box-shadow:0 30px 70px var(--accent-veil)}
+[data-layout='showcase-panel'][data-mirrored='true'] .showcase__media{grid-area:1/4/2/13}
+[data-layout='showcase-panel'][data-mirrored='true'] .showcase__copy{grid-area:1/1/2/7}
+[data-ground='dark'] .showcase__copy,[data-ground='accent'] .showcase__copy{background:var(--inverse);
+  color:var(--inverse-ink);border-color:var(--veil-line)}
+[data-layout='showcase-panel'] .showcase__copy .section-body{margin-top:16px}
 
 /* ---- layout: manifesto --------------------------------------------- */
 [data-layout='manifesto'] .shell{text-align:center}
@@ -446,7 +567,18 @@ h1{font-size:clamp(var(--size-h1-min),1.2rem + 5.4vw,var(--size-h1))}
 
 /* ---- media --------------------------------------------------------- */
 figure{margin:0;position:relative}
-.media-full-bleed img{width:100%;max-height:min(72vh,640px);object-fit:cover;border-radius:0}
+.media-full-bleed img{width:100%;max-height:min(64vh,560px);object-fit:cover;border-radius:0}
+/* A picture that fills the field is not the section — the copy under it still
+   has to carry the beat, so it is set at statement scale rather than at the
+   supporting size it would inherit from a prose block. The section also drops
+   its leading padding: with it, a full-bleed picture on a banded section
+   opened with a thin strip of band above the image, which reads as a
+   mistake rather than as a bleed. */
+[data-layout='media-full-bleed']{padding-block-start:0}
+[data-layout='media-full-bleed'] .section__head{margin-top:clamp(26px,3vw,48px)}
+[data-layout='media-full-bleed'] .section-heading{
+  font-size:clamp(1.9rem,1.2rem + 3.4vw,calc(var(--size-h1) * .72));max-width:19ch}
+[data-layout='media-full-bleed'] .section-body{font-size:clamp(1.08rem,1rem + .7vw,var(--size-lede))}
 .media-inset{margin:32px 0 0}
 .media-inset img{width:100%;border-radius:var(--radius-large);aspect-ratio:16/9;object-fit:cover}
 [data-image='duotone'] .frame img{filter:grayscale(1) contrast(1.06) brightness(1.02)}
@@ -504,6 +636,14 @@ figure{margin:0;position:relative}
   .hero__media img{aspect-ratio:16/10}
   .mosaic__cell{grid-column:span 6}
   [data-edge='notch'] [data-ground='dark']{clip-path:none}
+  [data-layout='chapter-opener'] .chapter{grid-template-columns:minmax(0,1fr)}
+  [data-layout='display-statement'] .prose--statement{width:100%}
+  [data-layout='showcase-panel'] .showcase{grid-template-columns:minmax(0,1fr)}
+  [data-layout='showcase-panel'] .showcase__media,
+  [data-layout='showcase-panel'] .showcase__copy,
+  [data-layout='showcase-panel'][data-mirrored='true'] .showcase__media,
+  [data-layout='showcase-panel'][data-mirrored='true'] .showcase__copy{grid-area:auto}
+  [data-layout='showcase-panel'] .showcase__copy{margin-inline:clamp(0px,3vw,32px);margin-top:-32px}
 }
 @media (max-width:600px){
   .hero{min-height:auto}
@@ -516,6 +656,8 @@ figure{margin:0;position:relative}
   [data-card='flat'] .card,[data-card='edge'] .card{padding-inline:0}
   [data-card='plate'] .card::after{inset:6px -6px -6px 6px}
   .closing--plinth .closing__panel{padding:24px}
+  [data-layout='poster-frame']{min-height:min(88vh,680px)}
+  [data-layout='showcase-panel'] .showcase__copy{margin-inline:0;margin-top:-20px}
 }
 @media (prefers-reduced-motion:reduce){
   html{scroll-behavior:auto}

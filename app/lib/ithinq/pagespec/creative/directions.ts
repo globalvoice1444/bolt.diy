@@ -102,6 +102,20 @@ export interface CompositionPolicy {
 
   /** Layout preference per section kind; `default` covers unlisted kinds. */
   layoutPreferences: Readonly<Record<string, readonly SectionLayout[]>>;
+
+  /**
+   * Preference order for a section that actually has a picture.
+   *
+   * Consulted ahead of the kind preferences, and rotated by how many
+   * image-led sections came before it, so a page holding several pictures
+   * gets several different compositions rather than the same split repeated.
+   *
+   * Media is media: a contract asset and renderer-local generated imagery
+   * both unlock this list. Gating it on the contract field alone is what made
+   * a generated section image a small inset inside a prose block, however
+   * image-led the brief was.
+   */
+  mediaLayouts: readonly SectionLayout[];
   cardStyle: CardStyle;
   ctaTreatment: CtaTreatment;
   motion: MotionLevel;
@@ -168,15 +182,16 @@ const editorialLuxe: CreativeDirection = {
     chapterEvery: 3,
     alternate: true,
     layoutPreferences: {
-      interrupt: ['manifesto', 'pull-quote', 'editorial-prose'],
-      scenario: ['offset-editorial', 'editorial-split', 'editorial-prose'],
-      pain: ['quote-panel', 'pull-quote', 'editorial-prose'],
-      mechanism: ['editorial-split', 'ledger', 'numbered-flow', 'editorial-prose'],
+      interrupt: ['manifesto', 'display-statement', 'pull-quote', 'editorial-prose'],
+      scenario: ['chapter-opener', 'offset-editorial', 'editorial-split', 'editorial-prose'],
+      pain: ['quote-panel', 'column-essay', 'pull-quote', 'editorial-prose'],
+      mechanism: ['editorial-split', 'column-essay', 'ledger', 'numbered-flow', 'editorial-prose'],
       vertical_fit: ['ledger', 'feature-rail', 'editorial-prose'],
       faq: ['qa-two-column', 'accordion'],
       risk: ['stat-band', 'cards', 'editorial-prose'],
-      default: ['editorial-prose'],
+      default: ['chapter-opener', 'editorial-prose'],
     },
+    mediaLayouts: ['editorial-split', 'poster-frame', 'showcase-panel', 'media-full-bleed'],
     cardStyle: 'flat',
     ctaTreatment: 'quiet',
     motion: 'subtle',
@@ -239,15 +254,16 @@ const conversionModern: CreativeDirection = {
     chapterEvery: null,
     alternate: true,
     layoutPreferences: {
-      interrupt: ['manifesto', 'editorial-split', 'editorial-prose'],
-      scenario: ['offset-editorial', 'editorial-split', 'editorial-prose'],
-      pain: ['stat-band', 'cards', 'editorial-prose'],
+      interrupt: ['display-statement', 'manifesto', 'editorial-split', 'editorial-prose'],
+      scenario: ['offset-editorial', 'chapter-opener', 'editorial-split', 'editorial-prose'],
+      pain: ['stat-band', 'cards', 'display-statement', 'editorial-prose'],
       mechanism: ['numbered-flow', 'ledger', 'editorial-split'],
       vertical_fit: ['bento-mosaic', 'cards', 'comparison-grid', 'feature-rail'],
       faq: ['accordion', 'qa-two-column'],
       risk: ['cards', 'stat-band', 'editorial-prose'],
-      default: ['editorial-prose'],
+      default: ['display-statement', 'editorial-prose'],
     },
+    mediaLayouts: ['showcase-panel', 'media-full-bleed', 'editorial-split', 'poster-frame'],
     cardStyle: 'elevated',
     ctaTreatment: 'banner',
     motion: 'subtle',
@@ -307,15 +323,16 @@ const serviceBold: CreativeDirection = {
     chapterEvery: null,
     alternate: false,
     layoutPreferences: {
-      interrupt: ['manifesto', 'quote-panel', 'editorial-prose'],
-      scenario: ['offset-editorial', 'editorial-split', 'editorial-prose'],
+      interrupt: ['display-statement', 'manifesto', 'quote-panel', 'editorial-prose'],
+      scenario: ['chapter-opener', 'offset-editorial', 'editorial-split', 'editorial-prose'],
       pain: ['stat-band', 'quote-panel', 'feature-rail'],
       mechanism: ['numbered-flow', 'ledger', 'editorial-split'],
       vertical_fit: ['bento-mosaic', 'cards', 'feature-rail'],
       faq: ['accordion'],
       risk: ['feature-rail', 'stat-band', 'editorial-prose'],
-      default: ['editorial-prose'],
+      default: ['display-statement', 'editorial-prose'],
     },
+    mediaLayouts: ['media-full-bleed', 'poster-frame', 'editorial-split', 'showcase-panel'],
     cardStyle: 'inverted',
     ctaTreatment: 'split',
     motion: 'expressive',
@@ -376,15 +393,16 @@ const clinicalCalm: CreativeDirection = {
     chapterEvery: 4,
     alternate: true,
     layoutPreferences: {
-      interrupt: ['manifesto', 'editorial-prose'],
-      scenario: ['editorial-prose', 'offset-editorial', 'editorial-split'],
-      pain: ['editorial-prose', 'quote-panel', 'pull-quote'],
+      interrupt: ['manifesto', 'display-statement', 'editorial-prose'],
+      scenario: ['chapter-opener', 'offset-editorial', 'editorial-split', 'editorial-prose'],
+      pain: ['column-essay', 'quote-panel', 'pull-quote', 'editorial-prose'],
       mechanism: ['numbered-flow', 'ledger', 'editorial-split'],
       vertical_fit: ['feature-rail', 'bento-mosaic', 'cards'],
       faq: ['qa-two-column', 'accordion'],
-      risk: ['stat-band', 'editorial-prose'],
-      default: ['editorial-prose'],
+      risk: ['stat-band', 'column-essay', 'editorial-prose'],
+      default: ['chapter-opener', 'editorial-prose'],
     },
+    mediaLayouts: ['editorial-split', 'showcase-panel', 'poster-frame', 'media-full-bleed'],
     cardStyle: 'outlined',
     ctaTreatment: 'inline',
     motion: 'subtle',

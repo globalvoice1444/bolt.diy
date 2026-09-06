@@ -178,3 +178,36 @@ export function mix(a: string, b: string, weight: number): string {
     b: left.b * (1 - w) + right.b * w,
   });
 }
+
+/**
+ * Flatten a translucent overlay against a backdrop.
+ *
+ * Contrast maths needs an opaque colour. A scrim over a photograph has none,
+ * so the worst case is computed instead: the brightest backdrop the picture
+ * could supply.
+ */
+export function composite(overlay: string, alpha: number, backdrop: string): string {
+  return mix(backdrop, overlay, clamp(alpha, 0, 1));
+}
+
+/**
+ * The lightest scrim that still carries text over an unknown picture.
+ *
+ * Generated imagery is never seen before it is served, so a scrim alpha
+ * cannot be eyeballed and must not be guessed. White is the brightest pixel
+ * any image can contain, so a veil that clears the target composited over
+ * white clears it over every possible photograph. The walk stops at the first
+ * alpha that clears, which keeps as much of the picture visible as legibility
+ * allows rather than drowning it in a safe, arbitrary 90%.
+ */
+export function resolveScrimAlpha(overlay: string, ink: string, target: number): number {
+  for (let alpha = 0.5; alpha <= 1; alpha += 0.02) {
+    const rounded = Number(alpha.toFixed(2));
+
+    if (contrastHex(ink, composite(overlay, rounded, '#ffffff')) >= target) {
+      return rounded;
+    }
+  }
+
+  return 1;
+}

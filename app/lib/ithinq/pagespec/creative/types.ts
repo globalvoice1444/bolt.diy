@@ -47,6 +47,18 @@ export type HeroVariant =
  * feasibility-gated against the content that actually exists, so a composition
  * needing four items is never chosen for a section holding two, and no layout
  * ever drops or pads content to fit.
+ *
+ * Four of these are image-led — `media-full-bleed`, `poster-frame`,
+ * `showcase-panel` and `editorial-split` — and a section reaches them when it
+ * has media from *either* channel: a contract asset, or renderer-local
+ * generated imagery. The two channels are equally real pictures, so gating an
+ * image-led composition on the contract field alone made every generated
+ * section image a small inset inside a prose block.
+ *
+ * The rest earn their range without a picture. Most sections a Partner
+ * Network document carries are body-only prose, so `display-statement`,
+ * `chapter-opener` and `column-essay` exist to give that prose scale,
+ * asymmetry and pacing rather than leaving it to three treatments.
  */
 export type SectionLayout =
   | 'editorial-prose'
@@ -59,9 +71,14 @@ export type SectionLayout =
   | 'accordion'
   | 'qa-two-column'
   | 'media-full-bleed'
+  | 'poster-frame'
+  | 'showcase-panel'
   | 'bento-mosaic'
   | 'stat-band'
   | 'offset-editorial'
+  | 'display-statement'
+  | 'chapter-opener'
+  | 'column-essay'
   | 'manifesto'
   | 'ledger'
   | 'quote-panel';

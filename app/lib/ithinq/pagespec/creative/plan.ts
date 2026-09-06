@@ -139,6 +139,10 @@ function itemsAreTerse(section: PageSpecSection, limit: number): boolean {
   return items.length > 0 && items.every((item) => item.trim().length <= limit);
 }
 
+function bodyLength(section: PageSpecSection): number {
+  return (section.body ?? '').trim().length;
+}
+
 /**
  * Whether a layout can actually present this section's content.
  *
@@ -147,8 +151,21 @@ function itemsAreTerse(section: PageSpecSection, limit: number): boolean {
  * contains. A layout is never chosen when it would have nothing to arrange,
  * and no layout is ever allowed to drop or pad content to fit — the fallback
  * is always a composition that can hold everything.
+ *
+ * `hasMedia` is the second half of the picture, and it is authoritative. A
+ * section's imagery can arrive on the contract (`section.asset`) or as
+ * renderer-local generated media, and both are equally real pictures. Asking
+ * only the contract field — which the Partner Network never populates — is
+ * what made every image-led layout unreachable for a generated page. The
+ * planner passes the effective answer, which is also how a section whose
+ * asset the hero borrowed is correctly treated as having no picture left; the
+ * default covers a caller reasoning about the contract alone.
  */
-export function isLayoutFeasible(layout: SectionLayout, section: PageSpecSection): boolean {
+export function isLayoutFeasible(
+  layout: SectionLayout,
+  section: PageSpecSection,
+  hasMedia: boolean = Boolean(section.asset),
+): boolean {
   switch (layout) {
     case 'cards':
       return itemCount(section) >= 2;
@@ -169,14 +186,48 @@ export function isLayoutFeasible(layout: SectionLayout, section: PageSpecSection
     case 'qa-two-column':
       return qaCount(section) >= 1;
     case 'media-full-bleed':
-      return Boolean(section.asset);
+      return hasMedia;
+    case 'poster-frame':
+      /*
+       * A visual moment: the picture carries the section and a short
+       * statement sits on it over a scrim. Long copy, a list or a Q&A on top
+       * of a photograph is unreadable however heavy the scrim, so those
+       * belong in a composition that gives them their own ground.
+       */
+      return (
+        hasMedia &&
+        Boolean(section.heading) &&
+        bodyLength(section) <= 260 &&
+        itemCount(section) === 0 &&
+        qaCount(section) === 0
+      );
+    case 'showcase-panel':
+      /* A layered picture with the copy on its own plate beside it. */
+      return hasMedia && hasBody(section);
     case 'editorial-split':
-      return Boolean(section.asset) || hasBody(section);
+      return hasMedia || hasBody(section);
     case 'offset-editorial':
       return hasBody(section) && Boolean(section.heading);
+    case 'display-statement':
+      /*
+       * Oversized type is a claim; it needs a heading to make and copy to
+       * back it. A single line hung off a display heading reads as a stranded
+       * caption rather than as a statement, and a very short beat already has
+       * a composition built for it in `manifesto`.
+       */
+      return Boolean(section.heading) && bodyLength(section) >= 80 && bodyLength(section) <= 440;
+    case 'chapter-opener':
+      return Boolean(section.heading) && hasBody(section);
+    case 'column-essay':
+      /*
+       * Two columns are a reading aid for a long passage and an affectation
+       * for a short one. The body stays a single run of text either way —
+       * splitting it would change what the document says.
+       */
+      return bodyLength(section) >= 420;
     case 'manifesto':
       /* A statement needs something to state, and room to breathe around it. */
-      return hasBody(section) && (section.body ?? '').trim().length <= 340;
+      return hasBody(section) && bodyLength(section) <= 340;
     case 'quote-panel':
     case 'pull-quote':
       return hasBody(section);
@@ -187,11 +238,57 @@ export function isLayoutFeasible(layout: SectionLayout, section: PageSpecSection
   }
 }
 
-function resolveLayout(policy: CompositionPolicy, section: PageSpecSection): SectionLayout {
-  const preferences = policy.layoutPreferences[section.kind] ?? policy.layoutPreferences.default ?? [];
+/** Rotate a preference list so consecutive uses of it start somewhere else. */
+function rotate<T>(items: readonly T[], by: number): T[] {
+  if (items.length === 0) {
+    return [];
+  }
 
-  for (const layout of preferences) {
-    if (isLayoutFeasible(layout, section)) {
+  const offset = ((by % items.length) + items.length) % items.length;
+
+  return [...items.slice(offset), ...items.slice(0, offset)];
+}
+
+/**
+ * Choose how one section is composed.
+ *
+ * The picture is an input, not an afterthought. When a section has media —
+ * from the contract or from generated imagery, the planner does not care
+ * which — the archetype's image-led preferences are consulted first, rotated
+ * by how many image-led sections came before, so a page holding five pictures
+ * gets five compositions rather than the same split five times.
+ *
+ * Structured content keeps its own arrangement. A section carrying items or a
+ * Q&A already has a composition designed for that shape — a mosaic, a ledger,
+ * an accordion — and an image-led layout would flatten it to a plain list to
+ * make room for the picture. Those sections keep their kind preferences and
+ * the image places as a split or an inset, which is what the media placement
+ * below decides.
+ *
+ * `avoid` is the treatment the previous image-led section took. Rotation
+ * alone is not enough: when one section rules a rotated first choice
+ * infeasible it falls through to exactly the entry the next section starts
+ * on, and the page gets the same full-bleed picture twice running. Demoting
+ * the last one used rather than removing it keeps it available when it is the
+ * only composition the content can fill.
+ */
+function resolveLayout(
+  policy: CompositionPolicy,
+  section: PageSpecSection,
+  hasMedia: boolean,
+  mediaOccurrence: number,
+  avoid: SectionLayout | null,
+): SectionLayout {
+  const preferences = policy.layoutPreferences[section.kind] ?? policy.layoutPreferences.default ?? [];
+  const structured = itemCount(section) > 0 || qaCount(section) > 0;
+  const rotated = rotate(policy.mediaLayouts, mediaOccurrence);
+  const spaced = avoid
+    ? [...rotated.filter((layout) => layout !== avoid), ...rotated.filter((layout) => layout === avoid)]
+    : rotated;
+  const ordered = hasMedia && !structured ? [...spaced, ...preferences] : preferences;
+
+  for (const layout of ordered) {
+    if (isLayoutFeasible(layout, section, hasMedia)) {
       return layout;
     }
   }
@@ -274,7 +371,42 @@ function seedFor(spec: PageSpec, directionId: DirectionId, intent: NormalisedCre
   ]);
 }
 
-const SPLIT_LAYOUTS: readonly SectionLayout[] = ['editorial-split', 'offset-editorial'];
+/** Compositions that place a picture in one column of a two-column field. */
+const SIDE_BY_SIDE_MEDIA: readonly SectionLayout[] = ['editorial-split', 'offset-editorial', 'showcase-panel'];
+
+/** Compositions where the picture is the field the section is drawn on. */
+const FIELD_MEDIA: readonly SectionLayout[] = ['media-full-bleed', 'poster-frame'];
+
+/** Every composition built around a picture rather than merely holding one. */
+const MEDIA_LED: readonly SectionLayout[] = ['media-full-bleed', 'poster-frame', 'showcase-panel', 'editorial-split'];
+
+function includes(list: readonly SectionLayout[], layout: SectionLayout): boolean {
+  return (list as readonly string[]).includes(layout);
+}
+
+/**
+ * How wide the first column of an asymmetric composition is.
+ *
+ * One seeded draw either way, so the stream stays in step whichever layout a
+ * section resolved to, but the range belongs to the composition: a hanging
+ * chapter mark wants a narrow first column, a display statement wants a
+ * dominant one, and a copy column that outgrew its own aside reads as a
+ * mistake rather than as asymmetry.
+ */
+function splitRange(layout: SectionLayout): readonly [number, number] {
+  switch (layout) {
+    case 'chapter-opener':
+      return [24, 38];
+    case 'offset-editorial':
+      return [36, 52];
+    case 'display-statement':
+      return [52, 68];
+    case 'showcase-panel':
+      return [46, 64];
+    default:
+      return [40, 62];
+  }
+}
 
 /**
  * Build the presentation plan for a validated PageSpec.
@@ -322,50 +454,60 @@ export function planPresentation(
 
   const sections: SectionPresentation[] = [];
   let splitOccurrence = 0;
+  let mediaOccurrence = 0;
+  let lastMediaLayout: SectionLayout | null = null;
   let sawSectionMedia = false;
 
   rendered.forEach(({ section, sourceIndex }, position) => {
-    const layout = resolveLayout(policy, section);
+    /*
+     * What this section actually has to show, decided before the layout is.
+     * A contract asset and generated imagery are the same fact to a
+     * composition; an asset the hero borrowed is no longer this section's to
+     * present, so it is not one.
+     */
+    const ownsAsset = Boolean(section.asset) && !(heroUsesMedia && sourceIndex === heroAssetIndex);
+    const generatedNeedId = generated.has(`section-${sourceIndex}`) ? `section-${sourceIndex}` : null;
+    const hasMedia = ownsAsset || Boolean(generatedNeedId);
+
+    const layout = resolveLayout(policy, section, hasMedia, mediaOccurrence, lastMediaLayout);
     const emphasis = emphasisOf(section);
     const promoted = policy.promoteLeadSections && emphasis === 'lead';
 
-    // The hero already presents this asset; the section must not repeat it.
-    const ownsAsset = Boolean(section.asset) && !(heroUsesMedia && sourceIndex === heroAssetIndex);
-    const isSplit = (SPLIT_LAYOUTS as readonly string[]).includes(layout);
+    const sideBySide = includes(SIDE_BY_SIDE_MEDIA, layout);
 
     let media: MediaPlacement = 'none';
 
-    if (ownsAsset) {
+    if (hasMedia) {
       sawSectionMedia = true;
+      mediaOccurrence += 1;
+      lastMediaLayout = includes(MEDIA_LED, layout) ? layout : lastMediaLayout;
 
-      if (layout === 'media-full-bleed') {
+      if (includes(FIELD_MEDIA, layout)) {
         media = 'full-bleed';
-      } else if (isSplit) {
+      } else if (sideBySide) {
         media = splitOccurrence % 2 === 0 ? 'trailing' : 'leading';
       } else {
         media = 'inset';
       }
     }
 
-    const generatedNeedId = generated.has(`section-${sourceIndex}`) ? `section-${sourceIndex}` : null;
-
-    if (generatedNeedId && media === 'none') {
-      sawSectionMedia = true;
-      media = isSplit ? (splitOccurrence % 2 === 0 ? 'trailing' : 'leading') : 'inset';
-    }
-
     /*
      * Only a media split may mirror. Flipping a copy-only split would place the
      * body visually before its own heading, which breaks reading order.
      */
-    const mirrored =
-      policy.alternate && isSplit && (ownsAsset || Boolean(generatedNeedId)) && splitOccurrence % 2 === 1;
+    const mirrored = policy.alternate && sideBySide && hasMedia && splitOccurrence % 2 === 1;
 
-    if (isSplit) {
+    if (sideBySide) {
       splitOccurrence += 1;
     }
 
-    const band: Band = bands[position] ?? 'base';
+    /*
+     * A poster is drawn on its own picture, not on the page's band. Saying so
+     * through `ground` rather than through a poster-specific colour rule is
+     * what keeps one set of tested foreground corrections in charge of every
+     * dark field on the page.
+     */
+    const band: Band = layout === 'poster-frame' ? 'inverted' : (bands[position] ?? 'base');
     const chapterStart = policy.chapterEvery !== null && position > 0 && position % policy.chapterEvery === 0;
 
     sections.push({
@@ -383,13 +525,24 @@ export function planPresentation(
       promoted,
 
       /* Asymmetry is seeded per section: a page of identical splits is a grid. */
-      split: layout === 'offset-editorial' ? rng.step(36, 52, 2) : rng.step(40, 62, 2),
+      split: rng.step(splitRange(layout)[0], splitRange(layout)[1], 2),
       spans: layout === 'bento-mosaic' ? mosaicSpans(itemCount(section), `${seed}|${sourceIndex}`) : null,
       generatedAssetNeedId: generatedNeedId,
     });
   });
 
-  const heroBand: Band = heroVariant === 'offset-panel' ? 'inverted' : heroVariant === 'framed-plate' ? 'tint' : 'base';
+  /*
+   * A hero drawn on its own picture is a dark ground and has to say so.
+   * Saying nothing left the lede and the introduction painted in `--ink-muted`
+   * — dark grey — over a dark full-bleed hero, which is a contrast failure the
+   * page had no way to report.
+   */
+  const heroBand: Band =
+    heroVariant === 'offset-panel' || heroVariant === 'full-bleed-media'
+      ? 'inverted'
+      : heroVariant === 'framed-plate'
+        ? 'tint'
+        : 'base';
 
   const hero: HeroPresentation = {
     variant: heroVariant,
