@@ -39,6 +39,14 @@ function fullVocabularyFixture(): PageSpec {
       ];
     }
 
+    if (kind === 'proof') {
+      section.quotes = [
+        { text: `An approved endorsement belonging to the ${kind} section.`, attribution: 'Named customer' },
+        { text: 'A second approved endorsement, verbatim.', source: 'Verified review', rating: 5, ratingScale: 5 },
+        { text: 'A third, carrying neither an attribution nor a rating.' },
+      ];
+    }
+
     if (kind === 'mechanism') {
       section.asset = { url: 'https://ithinq.ai/media/mechanism.png', kind: 'image', alt: 'Mechanism diagram' };
     }

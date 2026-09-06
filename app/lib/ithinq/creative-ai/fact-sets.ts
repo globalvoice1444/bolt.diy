@@ -14,13 +14,18 @@ import type { ApprovedFactSet } from './facts';
 /**
  * Transcribed from the contract's own med-spa example.
  *
- * The example cites eight distinct fact references across its mechanism, fit
- * and objection sections, and its mechanism body states exactly seven
- * capabilities in the same order as the seven refs that section carries. The
- * texts below are that document's own statements; the ref-to-text binding is
- * the renderer's reading of the document's ordering, not data received from
- * the fact authority. It is here so the pipeline can be exercised against a
- * genuinely authoritative document.
+ * The example cites thirteen distinct fact references across its mechanism,
+ * fit and objection sections. The texts below are not a reading of the
+ * document's prose: each one is the approved capability statement whose
+ * FactReference digest is exactly the ref the document cites, so the binding
+ * is derived and checkable rather than inferred from ordering. It is here so
+ * the pipeline can be exercised against a genuinely authoritative document.
+ *
+ * The refs are the Growth Engine's, computed over its own namespace, so they
+ * are NOT the digest of the text alone and this set is deliberately outside
+ * DERIVED_FACT_SETS. Re-vendoring the contract example changes every one of
+ * them, and this block has to be re-derived from the new example at the same
+ * time — the digests are what make that a mechanical job rather than a guess.
  */
 export const MED_SPA_CONTRACT_FACTS: ApprovedFactSet = {
   id: 'med-spa-contract',
@@ -28,44 +33,69 @@ export const MED_SPA_CONTRACT_FACTS: ApprovedFactSet = {
   authority: 'document-transcription',
   facts: [
     {
-      ref: 'f_96306cd554455b5bb303d64dbf5437ce7eb92545749c96e04df0ed580e62e643',
+      ref: 'f_c010a61ad3143f508d2f2623674240d86192122746e7fa0f811d821ac2682b19',
       kind: 'capability',
-      text: 'Answers inbound calls.',
+      text: 'iThinq AI works as a virtual receptionist that answers calls, handles the conversation, books the appointment and follows up',
     },
     {
-      ref: 'f_af61c1bdbb3db20f5b4a6ca334254274ad375a3a365c19f42709aadedbe16db0',
+      ref: 'f_77be89b60f049e0f0beb5a91c9b1148646b46a21d45852364fc3cfc823bf246f',
       kind: 'capability',
-      text: 'Takes the caller through the questions the team would ask.',
+      text: 'iThinq AI answers inbound calls 24 hours a day, every day, including the ones that arrive while the team is already on the phone',
     },
     {
-      ref: 'f_a8c46ae479f5359a6552000d08672866e39fd0dad9239f0a35376ba2e206a825',
+      ref: 'f_aa47e811ca0d8153551053c5e751877e6bde1396414bd2bb65c54a2f2c38c5b5',
       kind: 'capability',
-      text: 'Hands the conversation back in a form the business can act on.',
+      text: 'iThinq AI holds a natural spoken conversation, listens, asks and responds the way a trained receptionist does',
     },
     {
-      ref: 'f_c2dd9310361bfad1a0a5147dd8229dd98e1d8639388c368fa5bf6ff67a22fb91',
+      ref: 'f_a385166edc4b2a1d667c1239427c4f76df69025b4f230455edbff588604bf88f',
       kind: 'capability',
-      text: 'Asks the same questions in the same order whoever is on shift.',
+      text: 'iThinq AI checks availability and books the appointment during the call',
     },
     {
-      ref: 'f_0c3606bc20c166f8f32523f27114c864f20e96baa1cfc7262b1e2dbc0fe0faad',
+      ref: 'f_715ac41382dfc313ec81e6514a41e509fc5182cb6d4f8fd44e0825b71dfd077c',
       kind: 'capability',
-      text: 'Keeps follow-up moving after the call.',
+      text: 'iThinq AI confirms appointments and sends the reminders and preparation details that go with them',
     },
     {
-      ref: 'f_a78a68b95e01eef580dbbd9e8e5a1a24e0b98f40c327ac803ca2db51314d25a6',
-      kind: 'boundary',
-      text: 'Answers calls outside opening hours where your setup supports it. This depends on how the setup is configured and should be confirmed on the demo rather than assumed.',
+      ref: 'f_8eae91038e7f367c365828239f0e83bde8721a8fae181a00d238029334366524',
+      kind: 'capability',
+      text: 'iThinq AI asks the qualifying questions the team would ask and sorts the caller before anybody picks up',
     },
     {
-      ref: 'f_701d06dee7d3b0362003c55f0cad1dabbda50af451c6b4b509c9501892af6e94',
-      kind: 'boundary',
-      text: 'Does not replace the people who take the conversations that need a person.',
+      ref: 'f_f5192092f340ac32b85512a44ea72fd33fee26c410dcb0dbd086a8fa34f704ab',
+      kind: 'capability',
+      text: 'iThinq AI responds to online form enquiries by calling the person back',
     },
     {
-      ref: 'f_001dabb344cd8491be47d7ee23614a4c5f6218d228ba841692f05cdd76d34161',
-      kind: 'boundary',
-      text: 'Helps with the enquiries around care rather than giving clinical advice.',
+      ref: 'f_ebb613758c5829f2d9b49c85947461a04650ab47959a06acaefa84da1bdc7a2e',
+      kind: 'capability',
+      text: 'iThinq AI keeps following up with a lead across repeated attempts rather than stopping after one',
+    },
+    {
+      ref: 'f_8425e7281c55d84977e8c57263f7f58f9d54d0490269aa6bbaac19bf5a2ee4ba',
+      kind: 'capability',
+      text: 'iThinq AI can be configured to a persona of your choosing, from warm and consultative to brisk and professional',
+    },
+    {
+      ref: 'f_d50aef2e03a6f2f55ebdb6ebe69b79d5f602891de2cdbd4ca3c1de4b7434eabd',
+      kind: 'capability',
+      text: 'iThinq AI holds conversations in multiple languages, including English and Spanish',
+    },
+    {
+      ref: 'f_0af88cf19709c71e5d0238ce9cf2de66087bc5c4c94b6189f0811adfa3e06d42',
+      kind: 'capability',
+      text: 'iThinq AI remembers what was said in earlier conversations and carries it forward',
+    },
+    {
+      ref: 'f_1e2d15ed6a8e3ca4a1e2921eb28b53849cb212665683cddde93cde9847068e10',
+      kind: 'capability',
+      text: 'iThinq AI integrates with your CRM so conversations arrive as records rather than as notes to type up',
+    },
+    {
+      ref: 'f_a9576009ebf09bef874fb7743bb06db9d266f48eb397f1456e22d7386405496c',
+      kind: 'capability',
+      text: 'iThinq AI supports financing workflows, including walking a customer through the process and capturing what is needed',
     },
   ],
 };

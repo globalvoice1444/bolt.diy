@@ -3,6 +3,7 @@ import addFormats from 'ajv-formats';
 import pageSpecSchema from '@ithinq-pagespec/page-spec.schema.json';
 import {
   SECTION_KINDS,
+  SUPPORTED_VERSION,
   type PageSpec,
   type ValidationFinding,
   type ValidationResult,
@@ -144,11 +145,25 @@ function validateUrl(
 export function validatePageSpec(value: unknown, options: PageSpecValidationOptions = {}): ValidationResult {
   const version = isRecord(value) ? value.specVersion : undefined;
 
-  if (version !== '1.0') {
+  /*
+   * Exact, and fail closed.
+   *
+   * The supported version is read from the vendored contract rather than
+   * written again here, so adopting a minor is one deliberate act — re-vendor
+   * the bytes — instead of two literals that can drift apart. A document this
+   * consumer cannot read returns exactly ONE finding and nothing else is
+   * checked: its fields may not mean what this consumer thinks they mean, so
+   * further findings would be noise from a document it cannot read.
+   */
+  if (version !== SUPPORTED_VERSION) {
     return {
       renderable: false,
       findings: [
-        finding('fatal', 'unsupported_spec_version', `Expected PageSpec 1.0; received ${JSON.stringify(version)}.`),
+        finding(
+          'fatal',
+          'unsupported_spec_version',
+          `Expected PageSpec ${SUPPORTED_VERSION}; received ${JSON.stringify(version)}.`,
+        ),
       ],
       skipSections: [],
     };

@@ -59,6 +59,13 @@ export type HeroVariant =
  * Network document carries are body-only prose, so `display-statement`,
  * `chapter-opener` and `column-essay` exist to give that prose scale,
  * asymmetry and pacing rather than leaving it to three treatments.
+ *
+ * Four are for approved proof — `testimonial-feature`, `review-wall`,
+ * `proof-cards` and `quote-stack`. They are gated on how many quotes were
+ * approved rather than on the kind: one endorsement is a feature, a dozen are
+ * a wall, and a treatment is never chosen for a quantity it cannot present.
+ * None of them may drop, merge or re-attribute a quote, which is why the
+ * composer renders every quote under every one of them.
  */
 export type SectionLayout =
   | 'editorial-prose'
@@ -81,7 +88,11 @@ export type SectionLayout =
   | 'column-essay'
   | 'manifesto'
   | 'ledger'
-  | 'quote-panel';
+  | 'quote-panel'
+  | 'testimonial-feature'
+  | 'review-wall'
+  | 'proof-cards'
+  | 'quote-stack';
 
 /**
  * Background rhythm. Bands create visual chapters without touching content.

@@ -17,13 +17,13 @@ import { describe, expect, it } from 'vitest';
  * Replacing the snapshot is a deliberate act: take a reviewed contract release,
  * copy the bytes, and update both the commit and these digests together.
  */
-const PINNED_CONTRACT_COMMIT = '51c103ff2492b068095dc356225d5d9ef496b44b';
+const PINNED_CONTRACT_COMMIT = '68e39981235c95c48513dd29b2b8cfe35ba8931b';
 
 const EXPECTED_SHA256: Readonly<Record<string, string>> = {
-  'page-spec.schema.json': '3a88079cc7cfc9ec62805439d6616b0560da43148de41501f38d76949a1eddb3',
-  'page-spec.example.json': 'd4a8ca6f1370b8a4c38ea6ec05d92e641a64d39f41cef36be5f4bc1c95ec6874',
-  'page-spec.ts': '5a928aac315b5799dc4eb3da3aa14b6d9a9619a96b0cf92b3094fa2ec78df9f5',
-  'README.md': '2f6f50b1eec7cd972b3cbfe9392f4104ce352540a6da1bc1c7fe5d3afffa6e7b',
+  'page-spec.schema.json': 'b1c6e8cfcaa9c3920dc2ca6951c4d9dbcd5ae1f56f9ee8d8b50f0ce45f63f9ef',
+  'page-spec.example.json': 'dcc82f8a49996459072c685dc7a5abc2f0c2d683350596b92095ad3861c00aa2',
+  'page-spec.ts': '8f117d9a02e7f187e963f5c89f0c3092d4f187d3ccfea8e36c24c8fba56546c3',
+  'README.md': '09f60f31727ca7edaf9e6b15ab3f63410480e8618819f662a4bb6350d6154fc9',
 };
 
 const contractDir = join(dirname(fileURLToPath(import.meta.url)), '../../../../contracts/page-spec/v1');
@@ -49,7 +49,7 @@ describe('vendored PageSpec contract provenance', () => {
      * this line ever appears with one, a formatter has rewritten the vendored
      * file and provenance no longer holds.
      */
-    expect(source).toContain("export type SpecVersion = '1.0'\n");
-    expect(source).not.toContain("export type SpecVersion = '1.0';");
+    expect(source).toContain("export type SpecVersion = '1.1'\n");
+    expect(source).not.toContain("export type SpecVersion = '1.1';");
   });
 });

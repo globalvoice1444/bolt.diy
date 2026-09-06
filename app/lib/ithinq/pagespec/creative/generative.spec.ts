@@ -1,11 +1,13 @@
 import { describe, expect, it } from 'vitest';
 import examplePageSpec from '@ithinq-pagespec/page-spec.example.json';
-import type { PageSpec, PageSpecSection } from '@ithinq-pagespec/page-spec';
+import type { PageSpec, PageSpecSection, ProofQuote } from '@ithinq-pagespec/page-spec';
 import { compilePageSpecToProjectManifest } from '~/lib/ithinq/pagespec/compiler';
+import { validatePageSpec } from '~/lib/ithinq/pagespec/validator';
 import { composite, contrastHex } from './colour';
+import { escapeHtml } from './compose';
 import { normaliseCreativeIntent } from './intent';
 import { isLayoutFeasible, planPresentation } from './plan';
-import { DIRECTION_IDS, type PageCreativeIntent, type SectionLayout } from './index';
+import { composeDocument, DIRECTION_IDS, getDirection, type PageCreativeIntent, type SectionLayout } from './index';
 
 /*
  * The generative design system, held to the promises it makes.
@@ -255,6 +257,11 @@ function render(spec: PageSpec, options: Parameters<typeof compilePageSpecToProj
 
 function occurrences(haystack: string, needle: string): number {
   return haystack.split(needle).length - 1;
+}
+
+/** The rendered document only. The stylesheet names every selector too. */
+function body(html: string): string {
+  return html.slice(html.indexOf('</style>'));
 }
 
 /** Every design the suite exercises, as an unremarkable cross-product. */
@@ -941,5 +948,304 @@ describe('text drawn on a photograph is legible by measurement', () => {
 
       expect(contrastHex(inverseInk, inverse), `inverse ink (${label})`).toBeGreaterThanOrEqual(7);
     }
+  });
+});
+
+/*
+ * PageSpec 1.1 — approved proof.
+ *
+ * Quotes are the one kind of content on the page where a presentation mistake
+ * is indistinguishable from a fabrication. A dropped testimonial, a trimmed
+ * sentence, an attribution moved to the quote beside it, or four stars drawn
+ * beside a quote that carried no rating are all things a reader would take as
+ * evidence, and none of them would fail a rendering test that only checked the
+ * page looked designed. Everything below is about that, not about the styling.
+ */
+
+const APPROVED_QUOTES: readonly ProofQuote[] = [
+  {
+    text: 'Reception used to lose the four-thirty calls. Now every one of them is written down waiting for us in the morning, which is the first time in nine years that has been true.',
+    attribution: 'Practice manager, six-surgery group',
+    source: 'Recorded customer interview',
+    rating: 5,
+    ratingScale: 5,
+  },
+  {
+    text: 'It answered on the first ring at ten past seven on a Sunday evening and took the whole enquiry.',
+    attribution: 'Owner, single-site clinic',
+    source: null,
+    rating: null,
+    ratingScale: null,
+  },
+  {
+    text: 'The handover notes are better than the ones we were writing ourselves.',
+    attribution: null,
+    source: null,
+    rating: null,
+    ratingScale: null,
+  },
+  {
+    text: 'Two months in and the front desk has stopped apologising for the phone.',
+    attribution: 'Lead nurse',
+    source: 'Verified review',
+    rating: 4,
+    ratingScale: 5,
+  },
+  {
+    /*
+     * A scale that is not five. The schema caps `rating` itself at 5, so this
+     * is the largest rating a ten-point scale can currently carry — which is
+     * enough to prove the renderer reads the denominator it was given rather
+     * than assuming one.
+     */
+    text: 'We measured it. Nothing rang out for a fortnight.',
+    attribution: 'Director',
+    source: 'Case study',
+    rating: 4,
+    ratingScale: 10,
+  },
+];
+
+/** A document whose proof section carries exactly the quotes given. */
+function proofSpec(quotes: readonly ProofQuote[]): PageSpec {
+  const spec = proseSpec();
+  spec.page.reference = 'spec:dental:what-people-say';
+  spec.sections = [
+    section({
+      kind: 'mechanism',
+      purpose: 'explain_mechanism',
+      heading: 'How it works',
+      body: 'The assistant answers when reception cannot, and the practice gets the enquiry in writing.',
+    }),
+    section({
+      kind: 'proof',
+      purpose: 'establish_proof',
+      emphasis: 'lead',
+      heading: 'What people say',
+      quotes: [...quotes],
+    }),
+  ];
+
+  return spec;
+}
+
+/** Every direction crossed with several seeds, over one proof document. */
+function proofDesigns(spec: PageSpec) {
+  const results = [];
+
+  for (const direction of DIRECTION_IDS) {
+    for (const seed of ['', 'alpha', 'beta', 'gamma', 'delta', 'epsilon']) {
+      results.push(compilePageSpecToProjectManifest(spec, { direction, creative: seed ? { seed } : undefined }));
+    }
+  }
+
+  return results;
+}
+
+describe('approved proof is presented, never edited', () => {
+  it('validates a 1.1 document carrying a proof section', () => {
+    const result = validatePageSpec(proofSpec(APPROVED_QUOTES));
+
+    expect(result).toEqual({ renderable: true, findings: [], skipSections: [] });
+  });
+
+  it('refuses the same document at 1.0 with exactly one finding', () => {
+    const result = validatePageSpec({ ...proofSpec(APPROVED_QUOTES), specVersion: '1.0' });
+
+    expect(result.renderable).toBe(false);
+    expect(result.findings).toHaveLength(1);
+    expect(result.findings[0]?.code).toBe('unsupported_spec_version');
+    expect(result.findings[0]?.severity).toBe('fatal');
+  });
+
+  it('renders every quote verbatim, exactly once, under every design', () => {
+    for (const { manifest, plan } of proofDesigns(proofSpec(APPROVED_QUOTES))) {
+      const html = manifest.files['/index.html'] ?? '';
+      const label = `${plan.directionId}/${plan.design.seed}`;
+
+      for (const quote of APPROVED_QUOTES) {
+        expect(occurrences(html, escapeHtml(quote.text)), `${label} ${quote.text}`).toBe(1);
+      }
+    }
+  });
+
+  it('renders an attribution and a source only where the approval carried one', () => {
+    const html = body(render(proofSpec([APPROVED_QUOTES[0]!]), { direction: 'editorial-luxe' }));
+    const bare = body(render(proofSpec([APPROVED_QUOTES[2]!]), { direction: 'editorial-luxe' }));
+
+    expect(html).toContain('Practice manager, six-surgery group');
+    expect(html).toContain('Recorded customer interview');
+    expect(html).toContain('proof__attribution');
+    expect(html).toContain('proof__source');
+
+    /* A quote approved without either renders no citation shell at all. */
+    expect(bare).toContain(escapeHtml(APPROVED_QUOTES[2]!.text));
+    expect(bare).not.toContain('proof__cite');
+    expect(bare).not.toContain('proof__attribution');
+    expect(bare).not.toContain('proof__source');
+  });
+
+  it('draws a rating only when the document gave one, on a scale it also gave', () => {
+    const rated = body(render(proofSpec([APPROVED_QUOTES[0]!]), { direction: 'conversion-modern' }));
+    const unrated = body(render(proofSpec([APPROVED_QUOTES[1]!]), { direction: 'conversion-modern' }));
+
+    expect(rated).toContain('proof__rating');
+    expect(rated).toContain('aria-label="Rated 5 out of 5"');
+
+    /* Null is not zero: nothing is drawn, not an empty row of outlines. */
+    expect(unrated).not.toContain('proof__rating');
+    expect(unrated).not.toContain('proof__stars');
+    expect(unrated).not.toContain('Rated');
+  });
+
+  it('never assumes a scale of five', () => {
+    const outOfTen = body(render(proofSpec([APPROVED_QUOTES[4]!]), { direction: 'service-bold' }));
+
+    expect(outOfTen).toContain('aria-label="Rated 4 out of 10"');
+    expect(outOfTen).not.toContain('out of 5');
+
+    /* Four filled and six hollow — the scale the document named, not five. */
+    expect(occurrences(outOfTen, '&#9733;')).toBe(4);
+    expect(occurrences(outOfTen, '&#9734;')).toBe(6);
+  });
+
+  it('renders no rating at all when a rating arrives without its scale', () => {
+    const orphan = { text: 'A rating with no scale behind it.', attribution: 'Someone', rating: 4 };
+    const html = body(render(proofSpec([orphan]), { direction: 'clinical-calm' }));
+
+    expect(html).toContain(escapeHtml(orphan.text));
+    expect(html).toContain('Someone');
+    expect(html).not.toContain('proof__rating');
+    expect(html).not.toContain('&#9733;');
+    expect(html).not.toContain('out of');
+  });
+
+  it('skips a proof section that has no quotes rather than rendering a shell', () => {
+    /*
+     * The schema puts `minItems: 1` on an approved quote list, so this cannot
+     * arrive through the validator — which is exactly why it is proved at the
+     * seam that owns the rule. `planPresentation` and `composeDocument` are
+     * public, and a heading promising evidence with nothing under it is worse
+     * than no section at all.
+     */
+    const empty = proofSpec(APPROVED_QUOTES);
+    delete empty.sections[1]!.quotes;
+
+    const plan = planPresentation(empty, [], { direction: 'editorial-luxe' });
+    const html = composeDocument(empty, plan, getDirection(plan.directionId));
+
+    expect(plan.sections.map((entry) => entry.kind)).toEqual(['mechanism']);
+    expect(body(html)).not.toContain('What people say');
+    expect(body(html)).not.toContain('class="proof');
+    expect(html).not.toContain('data-kind="proof"');
+
+    /* The rest of the page is untouched. */
+    expect(html).toContain('How it works');
+  });
+
+  it('gives proof more than one arrangement across designs', () => {
+    const arrangements = new Set<string>();
+
+    for (const spec of [proofSpec(APPROVED_QUOTES), proofSpec(APPROVED_QUOTES.slice(0, 2))]) {
+      for (const { plan } of proofDesigns(spec)) {
+        const proof = plan.sections.find((entry) => entry.kind === 'proof');
+
+        expect(proof, 'proof section was planned').toBeDefined();
+        arrangements.add(proof!.layout);
+      }
+    }
+
+    expect(arrangements.size).toBeGreaterThan(1);
+
+    /* And never a composition that cannot hold what was approved. */
+    for (const layout of arrangements) {
+      expect(['testimonial-feature', 'review-wall', 'proof-cards', 'quote-stack']).toContain(layout);
+    }
+  });
+
+  it('stays a single static page with proof on it', () => {
+    for (const { manifest, plan } of proofDesigns(proofSpec(APPROVED_QUOTES))) {
+      const html = manifest.files['/index.html'] ?? '';
+      const label = `${plan.directionId}/${plan.design.seed}`;
+
+      expect(occurrences(html, '<style'), label).toBe(1);
+      expect(occurrences(html, '</style>'), label).toBe(1);
+      expect(occurrences(html, '<script'), label).toBe(0);
+      expect(html.includes(' style="'), label).toBe(false);
+      expect(html.includes(" style='"), label).toBe(false);
+    }
+  });
+
+  it('escapes a quote that tries to be markup', () => {
+    const hostile = { text: '<script>alert("proof")</script>', attribution: '<img src=x onerror=1>' };
+    const html = render(proofSpec([hostile]), { direction: 'conversion-modern' });
+
+    expect(html).not.toContain('<script');
+    expect(html).not.toContain('<img src=x');
+    expect(html).toContain('&lt;script&gt;alert(&quot;proof&quot;)&lt;/script&gt;');
+    expect(html).toContain('&lt;img src=x onerror=1&gt;');
+  });
+});
+
+describe('a long FAQ is still a designed FAQ', () => {
+  /** Sixteen questions, which a Partner Network page can now legitimately carry. */
+  function longFaqSpec(): PageSpec {
+    const spec = proseSpec();
+    spec.page.reference = 'spec:accounting:sixteen-questions';
+    spec.sections = [
+      section({
+        kind: 'faq',
+        purpose: 'handle_objection',
+        heading: 'Everything people ask',
+        qa: Array.from({ length: 16 }, (_, index) => ({
+          question: `Question number ${index + 1} about the assistant?`,
+          answer: `Answer number ${index + 1}, which is the approved wording and stays the approved wording.`,
+        })),
+      }),
+    ];
+
+    return spec;
+  }
+
+  it('compiles and renders all sixteen questions and answers', () => {
+    const spec = longFaqSpec();
+
+    for (const direction of DIRECTION_IDS) {
+      for (const seed of ['', 'alpha', 'beta']) {
+        const html = render(spec, { direction, creative: seed ? { seed } : undefined });
+        const label = `${direction}/${seed}`;
+
+        for (const pair of spec.sections[0]!.qa ?? []) {
+          expect(occurrences(html, escapeHtml(pair.question)), `${label} ${pair.question}`).toBe(1);
+          expect(occurrences(html, escapeHtml(pair.answer)), `${label} ${pair.answer}`).toBe(1);
+        }
+      }
+    }
+  });
+
+  it('keeps the disclosure native, with no script and no ARIA reimplementation', () => {
+    /* service-bold is the one archetype whose only FAQ preference is the accordion. */
+    const html = render(longFaqSpec(), { direction: 'service-bold' });
+
+    expect(html).toContain('<details');
+    expect(html).toContain('<summary>');
+    expect(occurrences(html, '<details')).toBe(16);
+    expect(html).not.toContain('<script');
+    expect(html).not.toContain('aria-expanded');
+    expect(html).not.toContain('role="button"');
+
+    /* Exactly one panel starts open, so a long list opens as an index. */
+    expect(occurrences(html, '<details open>')).toBe(1);
+  });
+
+  it('styles the disclosure rather than leaving it at the browser default', () => {
+    const html = render(longFaqSpec(), { direction: 'service-bold' });
+    const stylesheet = html.slice(html.indexOf('<style'), html.indexOf('</style>'));
+
+    /* A designed marker, a focus ring, and a rhythm that survives sixteen rows. */
+    expect(stylesheet).toContain('.faq summary::-webkit-details-marker{display:none}');
+    expect(stylesheet).toContain('.faq summary:focus-visible');
+    expect(stylesheet).toContain('.faq summary::after');
+    expect(stylesheet).toContain('nth-last-child(n+9)');
   });
 });
