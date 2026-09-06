@@ -59,11 +59,19 @@ export interface GeneratedMedia {
   alt: string;
 }
 
-/** Assets are references. The URL and alt text are rendered exactly as given. */
+/**
+ * Assets are references. The URL and alt text are rendered exactly as given.
+ *
+ * Always an `<img>`, never a CSS `background-image`. Generated media arrives
+ * from the caller and is escaped for an attribute context here; putting an
+ * untrusted URL inside a `url()` in the shared stylesheet would need a second,
+ * different escaping discipline in the one place the document has no
+ * per-element boundary left to contain a mistake.
+ */
 function renderAssetImage(asset: { url: string; alt: string }, className: string): string {
   const loading = className === 'hero__media' ? '' : ' loading="lazy" decoding="async"';
 
-  return `<figure class="${className}"><img ${attr('src', asset.url)} ${attr('alt', asset.alt)}${loading}></figure>`;
+  return `<figure class="frame ${className}"><img ${attr('src', asset.url)} ${attr('alt', asset.alt)}${loading}></figure>`;
 }
 
 function renderHead(section: PageSpecSection, presentation: SectionPresentation, showIndex: boolean): string {
@@ -93,22 +101,33 @@ function renderBody(section: PageSpecSection, presentation: SectionPresentation)
     return '';
   }
 
+  const text = escapeHtml(body);
+
   if (presentation.layout === 'pull-quote') {
-    return `<blockquote class="pull-quote">${escapeHtml(body)}</blockquote>`;
+    return `<blockquote class="pull-quote">${text}</blockquote>`;
+  }
+
+  if (presentation.layout === 'quote-panel') {
+    return `<blockquote class="quote-panel"><p>${text}</p></blockquote>`;
+  }
+
+  if (presentation.layout === 'manifesto') {
+    return `<p class="manifesto">${text}</p>`;
   }
 
   /* A drop cap needs a paragraph to sit in; short copy is marked so it is skipped. */
   const long = body.length >= 180 ? ' prose--long' : '';
 
-  return `<div class="prose${long}"><p class="section-body">${escapeHtml(body)}</p></div>`;
+  return `<div class="prose${long}"><p class="section-body">${text}</p></div>`;
 }
 
 /**
  * Items always render.
  *
- * The layout decides the arrangement — cards, a numbered flow, a rail — but a
- * section never loses its items because a direction preferred a different
- * composition.
+ * The layout decides the arrangement — cards, a mosaic, a metric row, a
+ * ledger, a numbered flow, a rail — but a section never loses an item because
+ * a composition preferred a different shape, and no arrangement ever pads the
+ * list to fill itself. Every branch below consumes the whole array.
  */
 function renderItems(section: PageSpecSection, presentation: SectionPresentation): string {
   const items = section.items ?? [];
@@ -129,6 +148,42 @@ function renderItems(section: PageSpecSection, presentation: SectionPresentation
       .join('');
 
     return `<ul class="card-grid">${cards}</ul>`;
+  }
+
+  if (layout === 'bento-mosaic') {
+    const cells = items
+      .map(
+        (item, index) =>
+          `<li class="mosaic__cell"><span class="mosaic__index" aria-hidden="true">${ordinal(index)}</span>` +
+          `<p>${escapeHtml(item)}</p></li>`,
+      )
+      .join('');
+
+    return `<ul class="mosaic">${cells}</ul>`;
+  }
+
+  if (layout === 'stat-band') {
+    const stats = items
+      .map(
+        (item, index) =>
+          `<li class="stat"><span class="stat__index" aria-hidden="true">${ordinal(index)}</span>` +
+          `<p class="stat__value">${escapeHtml(item)}</p></li>`,
+      )
+      .join('');
+
+    return `<ul class="stats">${stats}</ul>`;
+  }
+
+  if (layout === 'ledger') {
+    const rows = items
+      .map(
+        (item, index) =>
+          `<li class="ledger__row"><span class="ledger__index" aria-hidden="true">${ordinal(index)}</span>` +
+          `<span class="ledger__text">${escapeHtml(item)}</span></li>`,
+      )
+      .join('');
+
+    return `<ol class="ledger">${rows}</ol>`;
   }
 
   if (layout === 'numbered-flow') {
@@ -171,6 +226,10 @@ function renderQa(section: PageSpecSection, presentation: SectionPresentation): 
     return `<div class="qa-grid">${cells}</div>`;
   }
 
+  /*
+   * Native disclosure. The compiled document carries no JavaScript at all —
+   * `<details>` is what makes an accordion possible without any.
+   */
   const rows = qa
     .map(
       (item, index) =>
@@ -193,6 +252,8 @@ function shellClass(presentation: SectionPresentation): string {
 
   return 'shell';
 }
+
+const SPLIT_LAYOUTS = new Set(['editorial-split', 'offset-editorial']);
 
 function renderSection(
   spec: PageSpec,
@@ -227,7 +288,7 @@ function renderSection(
 
   let inner: string;
 
-  if (presentation.layout === 'editorial-split') {
+  if (SPLIT_LAYOUTS.has(presentation.layout)) {
     const mediaFigure = hasAsset && image ? renderAssetImage(image, 'layout__media') : '';
     const aside = items || qa;
 
@@ -278,6 +339,7 @@ function renderSection(
     attr('data-purpose', section.purpose),
     attr('data-emphasis', presentation.emphasis),
     attr('data-band', presentation.band),
+    attr('data-ground', presentation.ground),
     attr('data-mirrored', String(presentation.mirrored)),
     attr('data-split', splitFlavour),
     attr('data-section-index', String(presentation.sourceIndex)),
@@ -296,7 +358,6 @@ function renderHero(
   generatedMedia: ReadonlyMap<string, GeneratedMedia>,
   copyText?: CopyText,
 ): string {
-  const identity = [spec.partner.displayName, spec.partner.businessName].filter(Boolean).join(' · ');
   const heroAsset =
     plan.hero.mediaSourceIndex !== null
       ? spec.sections[plan.hero.mediaSourceIndex]?.asset
@@ -321,10 +382,10 @@ function renderHero(
       : `<div class="hero__grid">${media}${copy}</div>`;
 
   return [
-    `<section class="hero band-${plan.hero.band}" ${attr('data-hero', plan.hero.variant)} aria-labelledby="page-headline">`,
+    `<section class="hero band-${plan.hero.band}" ${attr('data-hero', plan.hero.variant)} ` +
+      `${attr('data-ground', plan.hero.ground)} ${attr('data-section-index', 'hero')} aria-labelledby="page-headline">`,
     `<div class="shell">${grid}</div>`,
     '</section>',
-    identity ? '' : '',
   ].join('');
 }
 
@@ -339,10 +400,13 @@ function renderClosing(spec: PageSpec, plan: CreativePresentationPlan, copyText?
   const inner =
     treatment === 'split'
       ? `<div class="closing__grid"><div class="measure">${copy}</div>${renderActions(spec)}</div>`
-      : `<div class="measure">${copy}</div>${renderActions(spec)}`;
+      : treatment === 'plinth'
+        ? `<div class="closing__panel"><div class="measure">${copy}</div>${renderActions(spec)}</div>`
+        : `<div class="measure">${copy}</div>${renderActions(spec)}`;
 
   return [
-    `<section class="section closing closing--${treatment} band-${plan.closing.band}" ${attr('data-cta', treatment)}>`,
+    `<section class="section closing closing--${treatment} band-${plan.closing.band}" ` +
+      `${attr('data-cta', treatment)} ${attr('data-ground', plan.closing.ground)}>`,
     `<div class="shell">${inner}</div>`,
     '</section>',
   ].join('');
@@ -365,6 +429,11 @@ function renderDisclosure(spec: PageSpec, placement: 'header' | 'inline' | 'foot
  * Sections are emitted in PageSpec array order. The contract states that order
  * is authored and must not be reordered, merged or split, so presentation
  * varies the treatment of each section, never its position.
+ *
+ * The output is a static page: no `<script>`, no event handler attribute, no
+ * `style` attribute, and exactly one `<style>` element. The Partner Network
+ * serves it under a policy that hashes that one sheet, and `generative.spec.ts`
+ * asserts every part of that shape.
  */
 export function composeDocument(
   spec: PageSpec,
@@ -375,7 +444,8 @@ export function composeDocument(
 ): string {
   const mediaByNeed = new Map(generatedMedia.map((item) => [item.assetNeedId, item]));
   const identity = [spec.partner.displayName, spec.partner.businessName].filter(Boolean).join(' · ');
-  const showIndex = direction.id === 'editorial-luxe' || direction.id === 'service-bold';
+  const { motif } = plan.design.decoration;
+  const showIndex = motif === 'index';
   const sections = plan.sections
     .map((presentation) => renderSection(spec, presentation, showIndex, mediaByNeed, copy))
     .join('');
@@ -387,13 +457,15 @@ export function composeDocument(
     '<meta charset="utf-8">',
     '<meta name="viewport" content="width=device-width, initial-scale=1">',
     `<title>${escapeHtml(spec.page.name)}</title>`,
-    `<style>${buildStylesheet(direction, plan)}</style>`,
+    `<style>${buildStylesheet(plan, direction)}</style>`,
     '</head>',
     `<body ${attr('data-direction', plan.directionId)} ${attr('data-card', plan.cardStyle)} ` +
-      `${attr('data-density', plan.density)} ${attr('data-motion', plan.motion)}>`,
+      `${attr('data-density', plan.density)} ${attr('data-motion', plan.motion)} ` +
+      `${attr('data-bg', plan.design.decoration.background)} ${attr('data-edge', plan.design.decoration.edge)} ` +
+      `${attr('data-motif', motif)} ${attr('data-image', plan.design.decoration.image)}>`,
     '<a class="skip" href="#content">Skip to content</a>',
     renderDisclosure(spec, 'header'),
-    '<header class="site-header"><div class="shell" style="display:flex;align-items:center;gap:14px;flex-wrap:wrap">',
+    '<header class="site-header"><div class="shell">',
     `<span class="site-header__name">${escapeHtml(spec.page.name)}</span>`,
     identity ? `<span class="identity">${escapeHtml(identity)}</span>` : '',
     '</div></header>',

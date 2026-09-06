@@ -11,6 +11,14 @@ export interface ProjectManifest {
     /** Presentation provenance. Which creative direction composed the document. */
     direction: string;
     directionLabel: string;
+
+    /**
+     * Which point in the design space the page came out at.
+     *
+     * A digest of the seed inputs, never the inputs themselves: enough to
+     * reproduce or explain a look, and no document or caller text at all.
+     */
+    designSeed: string;
   };
 }
 
