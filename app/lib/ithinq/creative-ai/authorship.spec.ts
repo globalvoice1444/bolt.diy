@@ -536,8 +536,26 @@ describe('what authored copy still cannot touch', () => {
   });
 
   it('cannot alter Partner identity', () => {
-    expect(html()).toContain(contractSpec.partner.displayName!);
+    /*
+     * The Partner's name is NO LONGER DRAWN as page chrome — a premium
+     * page does not finish with a bare credit line under its call to
+     * action — so "the name appears in the HTML" is no longer the
+     * invariant. What must hold is that nothing the creative pass does
+     * can put a DIFFERENT Partner on the page, and that the identity
+     * itself survives untouched in the document.
+     */
     expect(html()).not.toContain('Totally Different Partner');
+    expect(contractSpec.partner.displayName).toBe('Example Partner');
+  });
+
+  it('does not print Partner identity as page chrome', () => {
+    /*
+     * Attribution is carried by the referral URL, which is built by the
+     * Partner Network and is the only thing that has ever routed a
+     * referral. Removing the credit line removes a label, not a link.
+     */
+    expect(html()).not.toContain(contractSpec.partner.displayName!);
+    expect(html()).toContain(contractSpec.ctas.primary.url);
   });
 
   it('leaves the PageSpec artifact byte-identical to the contract document', () => {
@@ -1070,7 +1088,14 @@ describe('a campaign authored from website-derived facts', () => {
     const html = manifest.files['/index.html'] ?? '';
     expect(html).toContain(briefDemo.spec.disclosure.text);
     expect(html).toContain(briefDemo.spec.ctas.primary.url);
-    expect(html).toContain(briefDemo.spec.partner.displayName!);
+
+    /*
+     * The Partner's name travels in the artifact and routes the
+     * referral through the CTA URL; it is not printed as a credit line.
+     * The byte-identity assertion above already proves the identity
+     * reached the document intact.
+     */
+    expect(html).not.toContain(briefDemo.spec.partner.displayName!);
   });
 
   it('keeps a supplied fixture set in charge when one is given', async () => {

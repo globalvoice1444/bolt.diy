@@ -730,13 +730,10 @@ figure{margin:0;position:relative}
 .disclosure--header{background:var(--surface-alt);padding:12px 20px;text-align:center}
 .disclosure--inline{border:var(--border) solid var(--line);border-radius:var(--radius);padding:18px;
   margin-block:clamp(28px,4vw,56px)}
-.site-header{padding-block:20px;border-bottom:var(--border) solid var(--line)}
-.site-header .shell{display:flex;align-items:center;gap:14px;flex-wrap:wrap}
-.site-header__name{font-weight:700;font-size:.86rem;letter-spacing:.04em}
-.site-header .identity{margin-left:auto}
+/* No site-header rules: the page begins at the hero, and the band that
+   used to carry the spec's internal name is not emitted. */
 .site-footer{padding-block:clamp(32px,4vw,60px);border-top:var(--border) solid var(--line)}
 .site-footer .shell{display:grid;gap:14px}
-.site-footer strong{font-size:.9rem}
 
 /* ---- responsive ---------------------------------------------------- */
 @media (max-width:1000px){
@@ -768,7 +765,6 @@ figure{margin:0;position:relative}
 }
 @media (max-width:600px){
   .hero{min-height:auto}
-  .site-header .identity{margin-left:0}
   .button{width:100%}
   .actions{gap:10px}
   .flow__step{padding:16px}

@@ -85,6 +85,70 @@ describe('truth boundary under every creative direction', () => {
     }
   });
 
+  it('never renders internal spec metadata as customer-facing chrome', () => {
+    /*
+     * THE DEFECT THIS PINS. The document band above the hero used to
+     * print `page.name` — "General — Enquiries arriving when nobody can
+     * answer" — which is the SPEC's internal identifier, market and
+     * situation joined for somebody reading a list of generated pages.
+     * A premium page opening with a campaign label reads like a CMS
+     * preview.
+     *
+     * Every field checked here is provenance or routing metadata that
+     * the renderer reads to make decisions. None of it is copy, and the
+     * PageSpec README requires none of it to be displayed.
+     */
+    const spec = richFixture();
+
+    for (const direction of DIRECTION_IDS) {
+      const html = render(spec, direction);
+      const body = html.slice(html.indexOf('<body'));
+
+      expect(body).not.toContain(spec.page.name);
+      expect(body).not.toContain(spec.page.reference);
+      expect(body).not.toContain(spec.page.campaign ?? '\u0000never');
+      expect(body).not.toContain(spec.page.situation ?? '\u0000never');
+      expect(body).not.toContain('site-header');
+    }
+  });
+
+  it('begins the document at the hero', () => {
+    /*
+     * Clean top edge: nothing renders between the skip link and the
+     * page's own first designed section.
+     */
+    const spec = richFixture();
+
+    for (const direction of DIRECTION_IDS) {
+      const html = render(spec, direction);
+      const afterSkip = html.slice(html.indexOf('</a>') + 4);
+
+      expect(afterSkip.trimStart().startsWith('<main')).toBe(true);
+    }
+  });
+
+  it('does not print Partner identity as a credit line', () => {
+    /*
+     * A page used to finish with the Partner's bare name under the
+     * designed call to action. Identity is not chrome: the README says
+     * `displayName` may be null and the page then renders without a
+     * personal introduction, so drawing it was a presentation choice.
+     *
+     * ATTRIBUTION IS UNAFFECTED, and that is the point of the second
+     * assertion: the referral is carried by the CTA URL that the
+     * Partner Network built. This renderer has never been able to see a
+     * Partner id at all.
+     */
+    const spec = richFixture();
+
+    for (const direction of DIRECTION_IDS) {
+      const html = render(spec, direction);
+
+      expect(html).not.toContain(`<strong>${spec.partner.displayName}</strong>`);
+      expect(html).toContain(spec.ctas.primary.url);
+    }
+  });
+
   it('renders asset URLs and alt text unchanged', () => {
     const spec = richFixture();
     const asset = spec.sections.find((section) => section.asset)?.asset;

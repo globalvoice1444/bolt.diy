@@ -616,6 +616,34 @@ function renderClosing(spec: PageSpec, plan: CreativePresentationPlan, copyText?
   ].join('');
 }
 
+/**
+ * The page's closing edge.
+ *
+ * ONLY WHAT THE CONTRACT REQUIRES. The Partner's name used to be
+ * printed here as a credit line, so a page finished with a bare
+ * "jonas janvier" hanging under the designed call to action. Partner
+ * identity is not chrome: the README says `displayName` may be null and
+ * that a page then renders "without a personal introduction", so
+ * drawing it was always a presentation choice rather than an obligation,
+ * and it is one this renderer no longer makes. NOTHING about attribution
+ * changes — the referral URL is built by the Partner Network and
+ * travels in `ctas`, and this renderer has never been able to see a
+ * Partner id at all.
+ *
+ * The footer element itself is emitted only when it has something to
+ * hold, so removing its contents leaves a clean edge rather than an
+ * empty bordered band under the closing section.
+ */
+function renderSiteFooter(spec: PageSpec): string {
+  const disclosure = renderDisclosure(spec, 'footer');
+
+  if (disclosure === '') {
+    return '';
+  }
+
+  return `<footer class="site-footer"><div class="shell">${disclosure}</div></footer>`;
+}
+
 function renderDisclosure(spec: PageSpec, placement: 'header' | 'inline' | 'footer'): string {
   if ((spec.disclosure.placement ?? 'footer') !== placement) {
     return '';
@@ -647,7 +675,6 @@ export function composeDocument(
   copy?: CopyText,
 ): string {
   const mediaByNeed = new Map(generatedMedia.map((item) => [item.assetNeedId, item]));
-  const identity = [spec.partner.displayName, spec.partner.businessName].filter(Boolean).join(' · ');
   const { motif } = plan.design.decoration;
   const showIndex = motif === 'index';
   const sections = plan.sections
@@ -660,7 +687,7 @@ export function composeDocument(
     '<head>',
     '<meta charset="utf-8">',
     '<meta name="viewport" content="width=device-width, initial-scale=1">',
-    `<title>${escapeHtml(spec.page.name)}</title>`,
+    `<title>${escapeHtml(spec.page.headline)}</title>`,
     `<style>${buildStylesheet(plan, direction)}</style>`,
     '</head>',
     `<body ${attr('data-direction', plan.directionId)} ${attr('data-card', plan.cardStyle)} ` +
@@ -669,20 +696,31 @@ export function composeDocument(
       `${attr('data-motif', motif)} ${attr('data-image', plan.design.decoration.image)}>`,
     '<a class="skip" href="#content">Skip to content</a>',
     renderDisclosure(spec, 'header'),
-    '<header class="site-header"><div class="shell">',
-    `<span class="site-header__name">${escapeHtml(spec.page.name)}</span>`,
-    identity ? `<span class="identity">${escapeHtml(identity)}</span>` : '',
-    '</div></header>',
+
+    /*
+     * NO SITE HEADER. The page begins at the hero.
+     *
+     * This band used to carry `page.name` — "General — Enquiries
+     * arriving when nobody can answer" — above the fold. That string is
+     * the SPEC's internal identifier, market and situation joined for
+     * somebody reading a list of generated pages, and the contract
+     * never asked for it to be drawn. Nothing in the PageSpec README
+     * requires `page.name`, `page.campaign`, `page.vertical`,
+     * `page.situation`, `page.audience` or `page.reference` to appear:
+     * they are provenance and routing metadata that a renderer reads to
+     * make decisions, not copy a customer is meant to see.
+     *
+     * A premium page opening with an internal campaign label reads like
+     * a CMS preview, and it cost the first impression of every page this
+     * renderer has produced.
+     */
     '<main id="content">',
     renderHero(spec, plan, mediaByNeed, copy).replace('<h1>', '<h1 id="page-headline">'),
     sections,
     renderDisclosure(spec, 'inline'),
     renderClosing(spec, plan, copy),
     '</main>',
-    '<footer class="site-footer"><div class="shell">',
-    identity ? `<strong>${escapeHtml(identity)}</strong>` : '',
-    renderDisclosure(spec, 'footer'),
-    '</div></footer>',
+    renderSiteFooter(spec),
     '</body>',
     '</html>',
   ].join('');
