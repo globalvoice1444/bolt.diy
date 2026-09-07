@@ -85,6 +85,59 @@ describe('truth boundary under every creative direction', () => {
     }
   });
 
+  it('restyles the disclosure into the closing band without suppressing or shrinking it', () => {
+    /*
+     * OWNER ACCEPTANCE called this an orphan "compensation block": the
+     * disclosure sat in its own bordered strip beneath the designed call
+     * to action, on the page's default ground whatever the close was
+     * doing, so a dark or accent close ended in a visible seam and a
+     * pale band hanging off the bottom.
+     *
+     * The Owner chose to RESTYLE it rather than remove it, and the
+     * distinction is the whole point of this test. It is the
+     * compensation disclosure: the contract requires it, refuses a
+     * document without it, and forbids this renderer deciding whether it
+     * is needed. Making it part of the composition must never become
+     * making it hard to read.
+     */
+    const spec = richFixture();
+
+    for (const direction of DIRECTION_IDS) {
+      const html = render(spec, direction);
+
+      /* Present, verbatim, and inside the footer rather than loose. */
+      expect(html).toContain(spec.disclosure.text);
+      expect(html).toMatch(/<footer class="site-footer"[^>]*>/);
+
+      /*
+       * The footer carries a ground, which is what lets it continue the
+       * closing band instead of following it on a different field.
+       */
+      const footer = html.slice(html.indexOf('<footer class="site-footer"'));
+
+      expect(footer).toMatch(/data-ground="(light|dark|accent)"/);
+
+      /* Never hidden, collapsed or removed from the accessibility tree. */
+      expect(footer).not.toMatch(/display:\s*none/);
+      expect(footer).not.toMatch(/visibility:\s*hidden/);
+      expect(footer).not.toContain('aria-hidden');
+      expect(footer).not.toContain('hidden>');
+    }
+  });
+
+  it('keeps the disclosure at a readable size', () => {
+    /*
+     * A disclosure nobody can read is not a disclosure. The rule exists
+     * so "make it feel designed" can never quietly become 10px grey on
+     * grey — the failure mode this whole change is one step away from.
+     */
+    const css = render(richFixture(), DIRECTION_IDS[0]);
+    const rule = /\.site-footer \.disclosure\{[^}]*font-size:\.(\d+)rem/.exec(css);
+
+    expect(rule).not.toBeNull();
+    expect(Number(`0.${rule?.[1]}`)).toBeGreaterThanOrEqual(0.85);
+  });
+
   it('never renders internal spec metadata as customer-facing chrome', () => {
     /*
      * THE DEFECT THIS PINS. The document band above the hero used to

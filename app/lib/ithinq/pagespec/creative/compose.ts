@@ -634,14 +634,38 @@ function renderClosing(spec: PageSpec, plan: CreativePresentationPlan, copyText?
  * hold, so removing its contents leaves a clean edge rather than an
  * empty bordered band under the closing section.
  */
-function renderSiteFooter(spec: PageSpec): string {
+function renderSiteFooter(spec: PageSpec, plan: CreativePresentationPlan): string {
   const disclosure = renderDisclosure(spec, 'footer');
 
   if (disclosure === '') {
     return '';
   }
 
-  return `<footer class="site-footer"><div class="shell">${disclosure}</div></footer>`;
+  /*
+   * THE FOOTER CONTINUES THE CLOSING BAND, it does not follow it.
+   *
+   * The disclosure used to sit in its own bordered strip beneath the
+   * designed call to action, on the page's default ground whatever the
+   * close was doing. On a dark or accent close that produced a visible
+   * seam and a pale orphan block hanging off the bottom, which is what
+   * Owner acceptance saw and called a compensation block.
+   *
+   * Carrying the closing section's ground means the page ends on ONE
+   * field: the close and its fine print are the same composition, and
+   * the seam disappears without anything being hidden.
+   *
+   * IT IS RESTYLED, NEVER SUPPRESSED. This text is the compensation
+   * disclosure — the contract requires it, refuses a document without
+   * it, and forbids this renderer deciding whether it is needed. It
+   * stays legible, selectable, in the document order a reader reaches
+   * last, and it is never shrunk or faded to the point of being fine
+   * print nobody can read. Designed is not the same as quiet.
+   */
+  return (
+    `<footer class="site-footer" ${attr('data-ground', plan.closing.ground)}>` +
+    `<div class="shell">${disclosure}</div>` +
+    '</footer>'
+  );
 }
 
 function renderDisclosure(spec: PageSpec, placement: 'header' | 'inline' | 'footer'): string {
@@ -720,7 +744,7 @@ export function composeDocument(
     renderDisclosure(spec, 'inline'),
     renderClosing(spec, plan, copy),
     '</main>',
-    renderSiteFooter(spec),
+    renderSiteFooter(spec, plan),
     '</body>',
     '</html>',
   ].join('');
