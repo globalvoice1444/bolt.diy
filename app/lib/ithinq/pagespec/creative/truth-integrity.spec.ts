@@ -85,6 +85,123 @@ describe('truth boundary under every creative direction', () => {
     }
   });
 
+  it('restyles the disclosure into the closing band without suppressing or shrinking it', () => {
+    /*
+     * OWNER ACCEPTANCE called this an orphan "compensation block": the
+     * disclosure sat in its own bordered strip beneath the designed call
+     * to action, on the page's default ground whatever the close was
+     * doing, so a dark or accent close ended in a visible seam and a
+     * pale band hanging off the bottom.
+     *
+     * The Owner chose to RESTYLE it rather than remove it, and the
+     * distinction is the whole point of this test. It is the
+     * compensation disclosure: the contract requires it, refuses a
+     * document without it, and forbids this renderer deciding whether it
+     * is needed. Making it part of the composition must never become
+     * making it hard to read.
+     */
+    const spec = richFixture();
+
+    for (const direction of DIRECTION_IDS) {
+      const html = render(spec, direction);
+
+      /* Present, verbatim, and inside the footer rather than loose. */
+      expect(html).toContain(spec.disclosure.text);
+      expect(html).toMatch(/<footer class="site-footer"[^>]*>/);
+
+      /*
+       * The footer carries a ground, which is what lets it continue the
+       * closing band instead of following it on a different field.
+       */
+      const footer = html.slice(html.indexOf('<footer class="site-footer"'));
+
+      expect(footer).toMatch(/data-ground="(light|dark|accent)"/);
+
+      /* Never hidden, collapsed or removed from the accessibility tree. */
+      expect(footer).not.toMatch(/display:\s*none/);
+      expect(footer).not.toMatch(/visibility:\s*hidden/);
+      expect(footer).not.toContain('aria-hidden');
+      expect(footer).not.toContain('hidden>');
+    }
+  });
+
+  it('keeps the disclosure at a readable size', () => {
+    /*
+     * A disclosure nobody can read is not a disclosure. The rule exists
+     * so "make it feel designed" can never quietly become 10px grey on
+     * grey — the failure mode this whole change is one step away from.
+     */
+    const css = render(richFixture(), DIRECTION_IDS[0]);
+    const rule = /\.site-footer \.disclosure\{[^}]*font-size:\.(\d+)rem/.exec(css);
+
+    expect(rule).not.toBeNull();
+    expect(Number(`0.${rule?.[1]}`)).toBeGreaterThanOrEqual(0.85);
+  });
+
+  it('never renders internal spec metadata as customer-facing chrome', () => {
+    /*
+     * THE DEFECT THIS PINS. The document band above the hero used to
+     * print `page.name` — "General — Enquiries arriving when nobody can
+     * answer" — which is the SPEC's internal identifier, market and
+     * situation joined for somebody reading a list of generated pages.
+     * A premium page opening with a campaign label reads like a CMS
+     * preview.
+     *
+     * Every field checked here is provenance or routing metadata that
+     * the renderer reads to make decisions. None of it is copy, and the
+     * PageSpec README requires none of it to be displayed.
+     */
+    const spec = richFixture();
+
+    for (const direction of DIRECTION_IDS) {
+      const html = render(spec, direction);
+      const body = html.slice(html.indexOf('<body'));
+
+      expect(body).not.toContain(spec.page.name);
+      expect(body).not.toContain(spec.page.reference);
+      expect(body).not.toContain(spec.page.campaign ?? '\u0000never');
+      expect(body).not.toContain(spec.page.situation ?? '\u0000never');
+      expect(body).not.toContain('site-header');
+    }
+  });
+
+  it('begins the document at the hero', () => {
+    /*
+     * Clean top edge: nothing renders between the skip link and the
+     * page's own first designed section.
+     */
+    const spec = richFixture();
+
+    for (const direction of DIRECTION_IDS) {
+      const html = render(spec, direction);
+      const afterSkip = html.slice(html.indexOf('</a>') + 4);
+
+      expect(afterSkip.trimStart().startsWith('<main')).toBe(true);
+    }
+  });
+
+  it('does not print Partner identity as a credit line', () => {
+    /*
+     * A page used to finish with the Partner's bare name under the
+     * designed call to action. Identity is not chrome: the README says
+     * `displayName` may be null and the page then renders without a
+     * personal introduction, so drawing it was a presentation choice.
+     *
+     * ATTRIBUTION IS UNAFFECTED, and that is the point of the second
+     * assertion: the referral is carried by the CTA URL that the
+     * Partner Network built. This renderer has never been able to see a
+     * Partner id at all.
+     */
+    const spec = richFixture();
+
+    for (const direction of DIRECTION_IDS) {
+      const html = render(spec, direction);
+
+      expect(html).not.toContain(`<strong>${spec.partner.displayName}</strong>`);
+      expect(html).toContain(spec.ctas.primary.url);
+    }
+  });
+
   it('renders asset URLs and alt text unchanged', () => {
     const spec = richFixture();
     const asset = spec.sections.find((section) => section.asset)?.asset;

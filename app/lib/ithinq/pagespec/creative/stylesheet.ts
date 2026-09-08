@@ -234,6 +234,7 @@ a{color:inherit}
 [data-ground='accent'] .mosaic__cell{background:transparent;border-color:currentColor;color:currentColor}
 [data-ground='accent'] .button--primary{background:var(--accent-ink);color:var(--accent)}
 [data-ground='accent'] .pull-quote{border-color:currentColor;color:currentColor}
+[data-ground='accent'] .disclosure,
 [data-ground='accent'] .faq p,[data-ground='accent'] .faq summary,
 [data-ground='accent'] .faq summary:hover,[data-ground='accent'] .faq details[open] summary,
 [data-ground='accent'] .faq summary::after,[data-ground='accent'] .qa-item p{color:currentColor}
@@ -730,13 +731,23 @@ figure{margin:0;position:relative}
 .disclosure--header{background:var(--surface-alt);padding:12px 20px;text-align:center}
 .disclosure--inline{border:var(--border) solid var(--line);border-radius:var(--radius);padding:18px;
   margin-block:clamp(28px,4vw,56px)}
-.site-header{padding-block:20px;border-bottom:var(--border) solid var(--line)}
-.site-header .shell{display:flex;align-items:center;gap:14px;flex-wrap:wrap}
-.site-header__name{font-weight:700;font-size:.86rem;letter-spacing:.04em}
-.site-header .identity{margin-left:auto}
-.site-footer{padding-block:clamp(32px,4vw,60px);border-top:var(--border) solid var(--line)}
+/* No site-header rules: the page begins at the hero, and the band that
+   used to carry the spec's internal name is not emitted. */
+/* The closing edge. The footer CONTINUES the closing band rather than
+   following it, so the page resolves on one field instead of ending in a
+   pale strip bolted under the call to action. No top border by default:
+   the seam was what made it read as a separate block. A hairline returns
+   only when the close is on the page's own ground, where some separation
+   is what stops the fine print from touching the copy above it. */
+.site-footer{padding-block:clamp(28px,3.5vw,52px)}
 .site-footer .shell{display:grid;gap:14px}
-.site-footer strong{font-size:.9rem}
+.site-footer[data-ground='light'] .shell{border-top:var(--border) solid var(--line);
+  padding-top:clamp(20px,2.5vw,32px)}
+/* Legibility is not negotiable here: this is the compensation
+   disclosure, and it has to be readable to do its job. It is set one
+   step down from body copy, never smaller, and it keeps a measure so it
+   does not run the full width of a wide page as a single thin line. */
+.site-footer .disclosure{font-size:.86rem;max-width:62ch}
 
 /* ---- responsive ---------------------------------------------------- */
 @media (max-width:1000px){
@@ -768,7 +779,6 @@ figure{margin:0;position:relative}
 }
 @media (max-width:600px){
   .hero{min-height:auto}
-  .site-header .identity{margin-left:0}
   .button{width:100%}
   .actions{gap:10px}
   .flow__step{padding:16px}
