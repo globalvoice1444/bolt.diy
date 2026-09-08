@@ -426,6 +426,34 @@ function isMediaVariant(variant: HeroVariant): boolean {
  * strategy; a shuffle that dropped or demoted the one variant able to present
  * it would quietly turn an image-led brief into a typographic page.
  */
+/**
+ * Reorder a preference list against the seed, keeping the direction
+ * recognisable.
+ *
+ * The same square-weighted draw `varyPreferences` uses: the archetype's
+ * first choice usually stays first, so a direction still reads as
+ * itself, but anything it listed can come forward. Framing, crop and
+ * item rhythm all want exactly this — divergence without losing the
+ * house.
+ */
+function varyOrder<T>(list: readonly T[], rng: Rng): T[] {
+  if (list.length <= 1) {
+    return [...list];
+  }
+
+  const pool = [...list];
+  const result: T[] = [];
+
+  while (pool.length > 0) {
+    const span = Math.min(pool.length, 3);
+    const pick = Math.min(span - 1, Math.floor(rng.next() * rng.next() * span));
+
+    result.push(...pool.splice(pick, 1));
+  }
+
+  return result;
+}
+
 function varyHeroVariants(variants: readonly HeroVariant[], rng: Rng): HeroVariant[] {
   const typographic = rng.shuffled(variants.filter((variant) => !isMediaVariant(variant)));
   const result: HeroVariant[] = [];
@@ -531,6 +559,15 @@ export function synthesiseComposition(
     heroVariants: varyHeroVariants(policy.heroVariants, rng),
     contentWidth: rng.chance(0.75) ? policy.contentWidth : policy.contentWidth === 'narrow' ? 'wide' : 'narrow',
     bandPalette: policy.bandPalette,
+
+    /*
+     * Framing, crop and item rhythm are varied like every other
+     * preference list, so two generations in one direction reach for
+     * different pictures of the same page rather than the same one.
+     */
+    mediaFramings: varyOrder(policy.mediaFramings, rng),
+    mediaAspects: varyOrder(policy.mediaAspects, rng),
+    itemRhythms: varyOrder(policy.itemRhythms, rng),
 
     /*
      * Appetite varies per generation like everything else here, so two

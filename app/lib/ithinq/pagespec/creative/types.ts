@@ -109,6 +109,54 @@ export type ContentWidth = 'narrow' | 'wide' | 'full';
 
 export type MediaPlacement = 'none' | 'leading' | 'trailing' | 'full-bleed' | 'inset';
 
+/**
+ * How a picture meets the page around it.
+ *
+ * PLACEMENT SAYS WHERE, FRAMING SAYS HOW. Placement was the only axis,
+ * so an image was always a rectangle that sat inside the shell next to
+ * some text — correct, and the reason imagery read as placed content
+ * rather than as part of the composition. Framing is what lets the same
+ * placement be a polite inset on one page and a picture that breaks the
+ * gutter on another.
+ *
+ * This multiplies the existing layouts instead of adding more of them.
+ * Four media layouts times five framings is a far wider space than nine
+ * layouts would be, and none of it is a new template to fill.
+ */
+/*
+ * contained   inside the shell, aligned to the grid — the quiet option
+ * bleed-left  breaks the gutter on one side and runs to the viewport edge
+ * bleed-right the same, mirrored
+ * oversized   larger than its column, overlapping the grid asymmetrically
+ * overlap     pulled under the copy that follows, so the two layer
+ */
+export type MediaFraming = 'contained' | 'bleed-left' | 'bleed-right' | 'oversized' | 'overlap';
+
+/**
+ * The shape a picture is cropped to.
+ *
+ * Every image was rendered at whatever ratio it arrived in, so a page
+ * with three images had three arbitrary shapes and no rhythm between
+ * them. Cropping is an art-direction decision and belongs to the plan.
+ */
+export type MediaAspect = 'native' | 'portrait' | 'square' | 'landscape' | 'panorama';
+
+/**
+ * How much the items inside one section differ in weight.
+ *
+ * Capability beats rendered every item identically — N interchangeable
+ * cards — so a section could be scannable and still say nothing about
+ * which capability mattered. This is the hierarchy axis, and it applies
+ * across card, rail and mosaic layouts rather than being a layout of its
+ * own.
+ */
+/*
+ * even       every item equal — correct for a genuinely flat list
+ * lead       the first item takes a feature cell; the rest support it
+ * staggered  alternating weights, so the eye moves down rather than across
+ */
+export type ItemRhythm = 'even' | 'lead' | 'staggered';
+
 export type MotionLevel = 'none' | 'subtle' | 'expressive';
 
 export type Density = 'compact' | 'comfortable' | 'spacious';
@@ -234,6 +282,15 @@ export interface SectionPresentation {
   ground: BandGround;
   width: ContentWidth;
   media: MediaPlacement;
+
+  /** How the picture meets the page. Meaningless when `media` is none. */
+  framing: MediaFraming;
+
+  /** The shape the picture is cropped to. */
+  aspect: MediaAspect;
+
+  /** How much the items inside this section differ in weight. */
+  rhythm: ItemRhythm;
 
   /** Alternating compositions flip on odd occurrences. */
   mirrored: boolean;
