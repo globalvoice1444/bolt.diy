@@ -5,6 +5,7 @@ import { compilePageSpecToProjectManifest } from '~/lib/ithinq/pagespec/compiler
 import { validatePageSpec } from '~/lib/ithinq/pagespec/validator';
 import { composite, contrastHex } from './colour';
 import { assignBands, bandGround } from './design';
+import { SECTION_GROUNDS, SECTION_RHYTHM } from './stylesheet';
 import { escapeHtml } from './compose';
 import { normaliseCreativeIntent } from './intent';
 import { isLayoutFeasible, planPresentation } from './plan';
@@ -1567,6 +1568,143 @@ function planFor(spec: PageSpec, direction: (typeof DIRECTION_IDS)[number], refe
 }
 
 const REFERENCES = ['spec:a', 'spec:b', 'spec:c', 'spec:d', 'spec:e', 'spec:f'];
+
+/*
+ * THE SEAM BETWEEN TWO SECTIONS.
+ *
+ * `padding-block` never collapses, so every boundary pays both sections'
+ * rhythm in full. Production acceptance found the result: a dead pale field
+ * in the lower middle of a dental page, measured in a browser across 120
+ * generated pages at 294px median, 403px p90 and 468px at worst for a strong
+ * ground running into a light one — with no image anywhere near it. The same
+ * fields appeared on pages generated with zero imagery, which is what proved
+ * it was spacing rather than a picture that failed to render.
+ *
+ * One rule already closed this seam and its reasoning was correct — two
+ * strong grounds meeting is a crescendo, so the gap should not double — but
+ * it fired only when BOTH sides were strong, which is the rarest transition
+ * and, after the ranked-appetite change, rarer still. The widest transition
+ * had no rule at all.
+ *
+ * These tests pin the property, never a pixel: every ordered pair of distinct
+ * grounds is compensated, and no reachable boundary stacks more than the
+ * ceiling in BASE UNITS. A pixel assertion would stop meaning anything the
+ * moment `--rhythm` or `--density` moved.
+ */
+describe('section seams', () => {
+  function styleSheetFor(direction: (typeof DIRECTION_IDS)[number]): string {
+    const { manifest } = compilePageSpecToProjectManifest(fixture(), { direction });
+    const html = Object.values(manifest.files)[0] ?? '';
+
+    return /<style[^>]*>([\s\S]*?)<\/style>/.exec(html)?.[1] ?? '';
+  }
+
+  /** What one section alone claims, in base units. */
+  function ownMultiplier(ground: string, promoted: boolean): number {
+    if (ground === 'light') {
+      return promoted ? SECTION_RHYTHM.promoted : SECTION_RHYTHM.base;
+    }
+
+    return promoted ? SECTION_RHYTHM.promotedStrong : SECTION_RHYTHM.strong;
+  }
+
+  /** What the pair actually costs once the transition rules are applied. */
+  function seam(upper: string, upperPromoted: boolean, lower: string, lowerPromoted: boolean): number {
+    return upper === lower
+      ? ownMultiplier(upper, upperPromoted) + ownMultiplier(lower, lowerPromoted)
+      : SECTION_RHYTHM.transitionBottom + SECTION_RHYTHM.transitionTop;
+  }
+
+  it('compensates every ordered pair of distinct grounds', () => {
+    /*
+     * The coverage property. Not "the crescendo is handled" — every change
+     * of field, in both directions, because the argument for closing the
+     * seam is about the change and never about which grounds it joins.
+     */
+    const css = styleSheetFor('clinical-calm');
+
+    for (const from of SECTION_GROUNDS) {
+      for (const to of SECTION_GROUNDS) {
+        if (from === to) {
+          continue;
+        }
+
+        expect(css, `no transition rule for ${from} -> ${to}`).toContain(
+          `.section[data-ground='${from}'] + .section[data-ground='${to}']`,
+        );
+      }
+
+      /* The upper half of the same seam, reached the only way CSS can. */
+      expect(css, `no trailing-edge rule for a section above ${from}`).toContain(
+        `.section:has(+ .section[data-ground='${from}']):not([data-ground='${from}'])`,
+      );
+    }
+  });
+
+  it('keeps every reachable boundary under the seam ceiling', () => {
+    /*
+     * Same-ground pairs are included, because a light beat following a light
+     * beat is ordinary and common. Two strong grounds of the SAME ground are
+     * excluded as unreachable rather than as acceptable — `assignBands`
+     * refuses them, and 'never places the same strong ground twice running'
+     * above is the test that holds it to that.
+     */
+    let worst = 0;
+    let worstPair = '';
+
+    for (const upper of SECTION_GROUNDS) {
+      for (const lower of SECTION_GROUNDS) {
+        for (const upperPromoted of [false, true]) {
+          for (const lowerPromoted of [false, true]) {
+            if (upper === lower && upper !== 'light') {
+              continue;
+            }
+
+            const cost = seam(upper, upperPromoted, lower, lowerPromoted);
+
+            if (cost > worst) {
+              worst = cost;
+              worstPair = `${upper}${upperPromoted ? '+promoted' : ''} -> ${lower}${lowerPromoted ? '+promoted' : ''}`;
+            }
+          }
+        }
+      }
+    }
+
+    expect(worst, `worst seam is ${worst} base units at ${worstPair}`).toBeLessThanOrEqual(SECTION_RHYTHM.seamCeiling);
+  });
+
+  it('costs a change of field less than the grounds would claim alone', () => {
+    /*
+     * The regression itself. A strong ground running into a light one is the
+     * transition that measured worst, so it is the one asserted: crossing a
+     * change of field must cost strictly less than the two sections stacking
+     * their own rhythm, or the rule is present and doing nothing.
+     */
+    const compensated = seam('accent', true, 'light', true);
+    const naive = ownMultiplier('accent', true) + ownMultiplier('light', true);
+
+    expect(compensated).toBeLessThan(naive);
+
+    /* And a chapter still breathes: this is a seam, not a collapse. */
+    expect(compensated).toBeGreaterThanOrEqual(SECTION_RHYTHM.base * 1.5);
+  });
+
+  it('lets the transition rules win over the multipliers they correct', () => {
+    /*
+     * Both sets are plain declarations in one sheet, so source order is half
+     * of what decides the outcome. A transition rule emitted before the
+     * multiplier it corrects would be silently overridden and every
+     * assertion above would still pass.
+     */
+    const css = styleSheetFor('clinical-calm');
+    const multiplier = css.indexOf(".section--promoted[data-ground='dark']");
+    const transition = css.indexOf(".section[data-ground='light'] + .section[data-ground='dark']");
+
+    expect(multiplier).toBeGreaterThan(-1);
+    expect(transition).toBeGreaterThan(multiplier);
+  });
+});
 
 describe('art direction', () => {
   it('keeps several distinct image treatments reachable', () => {
