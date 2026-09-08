@@ -483,10 +483,37 @@ export function planPresentation(
     }))
     .filter(({ section }) => !isEmptyProof(section));
 
+  /*
+   * The hero's own band, resolved BEFORE the sections so the first
+   * section knows what it is opening against.
+   *
+   * These were computed independently, so a dark hero could run
+   * straight into a dark first section and the two read as one
+   * interrupted field — the same defect the section run guards against
+   * internally, escaping through the one seam that run could not see.
+   * A test caught this rather than a review.
+   */
+  const heroBand: Band =
+    heroVariant === 'offset-panel' || heroVariant === 'full-bleed-media'
+      ? 'inverted'
+      : heroVariant === 'framed-plate'
+        ? 'tint'
+        : 'base';
+
+  const closingBand: Band =
+    policy.ctaTreatment === 'banner' || policy.ctaTreatment === 'split'
+      ? 'accent'
+      : policy.ctaTreatment === 'plinth'
+        ? 'deep'
+        : 'tint';
+
   const bands = assignBands(
     policy.bandPalette,
     rendered.map(({ section }) => ({ purpose: section.purpose, emphasis: emphasisOf(section) })),
     seed,
+    policy.bandAppetite,
+    heroBand,
+    closingBand,
   );
 
   const sections: SectionPresentation[] = [];
@@ -574,13 +601,6 @@ export function planPresentation(
    * — dark grey — over a dark full-bleed hero, which is a contrast failure the
    * page had no way to report.
    */
-  const heroBand: Band =
-    heroVariant === 'offset-panel' || heroVariant === 'full-bleed-media'
-      ? 'inverted'
-      : heroVariant === 'framed-plate'
-        ? 'tint'
-        : 'base';
-
   const hero: HeroPresentation = {
     variant: heroVariant,
     media: heroUsesMedia ? (heroVariant === 'full-bleed-media' ? 'full-bleed' : 'trailing') : 'none',
@@ -590,13 +610,6 @@ export function planPresentation(
     mediaSourceIndex: heroUsesMedia && heroAssetIndex !== null ? heroAssetIndex : null,
     generatedAssetNeedId: heroUsesMedia && heroAssetIndex === null && heroHasGenerated ? 'hero' : null,
   };
-
-  const closingBand: Band =
-    policy.ctaTreatment === 'banner' || policy.ctaTreatment === 'split'
-      ? 'accent'
-      : policy.ctaTreatment === 'plinth'
-        ? 'deep'
-        : 'tint';
 
   const closing: ClosingPresentation = {
     treatment: policy.ctaTreatment,

@@ -94,6 +94,17 @@ export interface CompositionPolicy {
   /** Bands this archetype is willing to use. The rhythm generator draws here. */
   bandPalette: readonly Band[];
 
+  /**
+   * How much of the page this direction is willing to spend on strong
+   * ground, as a fraction of its sections.
+   *
+   * It was a constant — one strong band per three sections, network
+   * wide — so every archetype composed with the same restraint however
+   * bold its palette was, and a five-section page got exactly one.
+   * Confidence is a property of the direction, so the direction owns it.
+   */
+  bandAppetite: number;
+
   /** Start a new visual chapter every N sections. Null disables chapters. */
   chapterEvery: number | null;
 
@@ -178,7 +189,8 @@ const editorialLuxe: CreativeDirection = {
   composition: {
     heroVariants: ['split-media', 'editorial-stack', 'asymmetric-offset'],
     contentWidth: 'narrow',
-    bandPalette: ['base', 'base', 'tint', 'wash', 'deep'],
+    bandPalette: ['base', 'base', 'tint', 'deep', 'wash', 'accent'],
+    bandAppetite: 0.4,
     chapterEvery: 3,
     alternate: true,
     layoutPreferences: {
@@ -242,7 +254,7 @@ const conversionModern: CreativeDirection = {
     radius: 12,
     border: 1,
     container: 1240,
-    heroMinHeight: 76,
+    heroMinHeight: 82,
     background: 'aurora',
     motif: 'none',
     image: 'plate',
@@ -251,7 +263,8 @@ const conversionModern: CreativeDirection = {
   composition: {
     heroVariants: ['split-media', 'offset-panel', 'framed-plate'],
     contentWidth: 'wide',
-    bandPalette: ['base', 'raised', 'wash', 'tint', 'deep'],
+    bandPalette: ['base', 'raised', 'deep', 'wash', 'accent', 'tint', 'inverted'],
+    bandAppetite: 0.5,
     chapterEvery: null,
     alternate: true,
     layoutPreferences: {
@@ -322,6 +335,7 @@ const serviceBold: CreativeDirection = {
     heroVariants: ['offset-panel', 'centered-statement', 'full-bleed-media', 'asymmetric-offset'],
     contentWidth: 'wide',
     bandPalette: ['inverted', 'base', 'accent', 'base', 'deep'],
+    bandAppetite: 0.6,
     chapterEvery: null,
     alternate: false,
     layoutPreferences: {
@@ -383,7 +397,7 @@ const clinicalCalm: CreativeDirection = {
     radius: 18,
     border: 1,
     container: 1200,
-    heroMinHeight: 72,
+    heroMinHeight: 80,
     background: 'aurora',
     motif: 'none',
     image: 'soft-mask',
@@ -392,7 +406,8 @@ const clinicalCalm: CreativeDirection = {
   composition: {
     heroVariants: ['centered-statement', 'split-media', 'framed-plate'],
     contentWidth: 'narrow',
-    bandPalette: ['base', 'tint', 'base', 'wash', 'raised', 'deep'],
+    bandPalette: ['base', 'tint', 'deep', 'wash', 'raised', 'accent'],
+    bandAppetite: 0.34,
     chapterEvery: 4,
     alternate: true,
     layoutPreferences: {
