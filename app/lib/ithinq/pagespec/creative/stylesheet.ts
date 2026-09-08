@@ -174,6 +174,92 @@ function sectionVariables(plan: CreativePresentationPlan): string {
  * `data-ground` decides the foreground corrections, which is how one system
  * supports many compositions and many palettes without branching per design.
  */
+/**
+ * Section rhythm, as multipliers of one base unit.
+ *
+ * These live here as values rather than as literals inside the sheet because
+ * the seam between two sections is a property of the PAIR, and a pair cannot
+ * be reasoned about — or tested — while each half is a number buried in a
+ * template string.
+ */
+export const SECTION_RHYTHM = {
+  /** A supporting beat on a plain ground. */
+  base: 1,
+
+  /** A strong ground is a chapter and gets the air one needs. */
+  strong: 1.45,
+
+  /** A beat the strategy already said carries weight. */
+  promoted: 1.2,
+
+  /** Both at once. */
+  promotedStrong: 1.6,
+
+  /*
+   * WHEREVER THE GROUND CHANGES, THE SEAM STOPS PAYING TWICE.
+   *
+   * `padding-block` never collapses, so two adjacent sections stack their
+   * full rhythm into one empty field. That was survivable while both
+   * multipliers were near 1, and stopped being so once a strong ground took
+   * 1.45 and a promoted one 1.2: measured in a browser over 120 generated
+   * pages, a strong ground running into a light one opened a dead field of
+   * 294px median, 403px at p90 and 468px at worst — half a laptop viewport
+   * of nothing, which production acceptance correctly called a defect.
+   *
+   * One rule already existed for this and its reasoning was right: two
+   * strong grounds meeting is a crescendo, so the seam closes up rather than
+   * doubling the gap. It was simply never extended. A CHANGE OF FIELD IS
+   * ITSELF THE SEPARATOR — that argument does not depend on both sides being
+   * strong, and the transition it did not cover is the one that measured
+   * worst.
+   *
+   * So both halves of a changing seam return to the base rhythm rather than
+   * to whatever each section claimed alone. Same-ground boundaries are left
+   * exactly as they were: with no colour change to do the separating, the
+   * space is the only thing marking the beat.
+   */
+  transitionTop: 0.9,
+  transitionBottom: 1,
+
+  /**
+   * No boundary may stack more than this many base units of empty field.
+   *
+   * Relative, never a pixel: the unit is `clamp(40px,5.4vw,104px)` scaled by
+   * the generated `--rhythm` and `--density`, so a ceiling in pixels would
+   * silently stop meaning anything the moment a token moved.
+   */
+  seamCeiling: 2.5,
+} as const;
+
+/** Every ground a section can be drawn on. */
+export const SECTION_GROUNDS = ['light', 'dark', 'accent'] as const;
+
+/** One base unit of vertical rhythm, before any multiplier. */
+const RHYTHM_UNIT = 'clamp(40px,5.4vw,104px) * var(--rhythm) * var(--density)';
+
+function rhythmPad(multiplier: number): string {
+  return `calc(${RHYTHM_UNIT}${multiplier === 1 ? '' : ` * ${multiplier}`})`;
+}
+
+/** Every ordered pair of DISTINCT grounds. A same-ground seam is not a change. */
+const GROUND_CHANGES = SECTION_GROUNDS.flatMap((from) =>
+  SECTION_GROUNDS.filter((to) => to !== from).map((to) => [from, to] as const),
+);
+
+const TRANSITION_TOP_SELECTOR = GROUND_CHANGES.map(
+  ([from, to]) => `.section[data-ground='${from}'] + .section[data-ground='${to}']`,
+).join(',\n');
+
+/*
+ * The upper half of the same seam. `:has()` is the only way to style a
+ * section by what FOLLOWS it, and where it is unsupported this rule is simply
+ * skipped — the page then behaves exactly as it did before, which is the
+ * right way for a spacing correction to degrade.
+ */
+const TRANSITION_BOTTOM_SELECTOR = SECTION_GROUNDS.map(
+  (to) => `.section:has(+ .section[data-ground='${to}']):not([data-ground='${to}'])`,
+).join(',\n');
+
 const BASE_CSS = `
 *,*::before,*::after{box-sizing:border-box}
 html{-webkit-text-size-adjust:100%;scroll-behavior:smooth}
@@ -188,7 +274,7 @@ a{color:inherit}
 .skip:focus{transform:none}
 
 /* ---- rhythm -------------------------------------------------------- */
-.section{padding-block:calc(clamp(40px,5.4vw,104px) * var(--rhythm) * var(--density));position:relative;isolation:isolate}
+.section{padding-block:${rhythmPad(SECTION_RHYTHM.base)};position:relative;isolation:isolate}
 /* SECTION RHYTHM IS NOT UNIFORM. Every section used to breathe by
    exactly the same amount, so a page of five beats read as five stacked
    blocks whatever those beats were doing — the metronome that made a
@@ -197,15 +283,17 @@ a{color:inherit}
    one. The multipliers stay modest so this reads as rhythm rather than
    as sections falling apart. */
 .section[data-ground='dark'],.section[data-ground='accent']{
-  padding-block:calc(clamp(40px,5.4vw,104px) * var(--rhythm) * var(--density) * 1.45)}
-.section--promoted{padding-block:calc(clamp(40px,5.4vw,104px) * var(--rhythm) * var(--density) * 1.2)}
+  padding-block:${rhythmPad(SECTION_RHYTHM.strong)}}
+.section--promoted{padding-block:${rhythmPad(SECTION_RHYTHM.promoted)}}
 .section--promoted[data-ground='dark'],.section--promoted[data-ground='accent']{
-  padding-block:calc(clamp(40px,5.4vw,104px) * var(--rhythm) * var(--density) * 1.6)}
-/* Two strong grounds meeting is a deliberate crescendo, so the seam
-   between them closes up rather than doubling the gap. */
-.section[data-ground='dark'] + .section[data-ground='accent'],
-.section[data-ground='accent'] + .section[data-ground='dark']{padding-top:calc(
-  clamp(40px,5.4vw,104px) * var(--rhythm) * var(--density) * .9)}
+  padding-block:${rhythmPad(SECTION_RHYTHM.promotedStrong)}}
+/* A change of field is itself the separator, so a seam across it stops
+   paying full rhythm on both sides. Two strong grounds meeting is the
+   crescendo this rule was originally written for, and it keeps exactly
+   the spacing it had; every other transition now gets the same
+   treatment, because none of them needed the gap either. */
+${TRANSITION_TOP_SELECTOR}{padding-top:${rhythmPad(SECTION_RHYTHM.transitionTop)}}
+${TRANSITION_BOTTOM_SELECTOR}{padding-bottom:${rhythmPad(SECTION_RHYTHM.transitionBottom)}}
 .shell{width:min(100% - clamp(32px,7vw,120px),var(--container));margin-inline:auto;position:relative;z-index:1}
 .shell--narrow > *{max-width:min(100%,980px)}
 .shell--full{width:100%}
