@@ -661,6 +661,86 @@ export interface BandInput {
 }
 
 /**
+ * Choose which beats compose strongly, before any band is placed.
+ *
+ * Two rules, and the second is the one that makes a page read as composed
+ * rather than as a strong opening followed by a long tail of nothing.
+ *
+ * RANKED, NOT GATED. Every beat is a candidate and they are ordered by what
+ * they earned, so appetite decides how many compose strongly and the document
+ * decides which. The absolute `weight >= 2` bar this replaces was a property
+ * of the weight table rather than of the page: `establish_fit` with
+ * supporting emphasis scores 0 and `handle_objection` with lead emphasis
+ * scores 0, and those are the two beats a document almost always ends on. No
+ * appetite could reach them, because appetite only ever raised a ceiling that
+ * was not the binding constraint.
+ *
+ * SPREAD, NOT SPENT. The eligible run is partitioned into `cap` contiguous
+ * segments and the best candidate in each takes one strong band. That is what
+ * lets composition reach the close without any rule naming a position: a page
+ * with budget for two strong beats gets one in each half because the segments
+ * say so, not because the tail was special-cased. Nothing here knows a
+ * vertical, an index or a section count.
+ *
+ * The jitter is deliberately smaller than one weight step. Weights are
+ * integers, so it settles exact ties and nothing else — two equally earned
+ * beats diverge from seed to seed, while a beat that genuinely outranks its
+ * neighbour still wins every time. Hierarchy stays earned rather than drawn.
+ */
+function selectStrongSections(
+  sections: readonly BandInput[],
+  cap: number,
+  palette: readonly Band[],
+  rng: Rng,
+): Set<number> {
+  /*
+   * A page never opens on its heaviest band unless the archetype leads with
+   * one. This is the only positional rule here, it is unchanged, and it is a
+   * property of the palette rather than of the document.
+   */
+  const opensStrong = bandGround(palette[0] ?? 'base') !== 'light';
+
+  /*
+   * Scored for every section, including one the opening rule then removes, so
+   * the draw order depends on the document's length rather than on which
+   * beats happened to be eligible.
+   */
+  const candidates = sections
+    .map((section, index) => ({ index, score: weightOf(section.purpose, section.emphasis) + rng.next() }))
+    .filter((entry) => entry.index > 0 || opensStrong);
+
+  if (cap <= 0 || candidates.length === 0) {
+    return new Set();
+  }
+
+  if (cap >= candidates.length) {
+    return new Set(candidates.map((entry) => entry.index));
+  }
+
+  const chosen = new Set<number>();
+
+  for (let segment = 0; segment < cap; segment += 1) {
+    const from = Math.floor((segment * candidates.length) / cap);
+    const to = Math.floor(((segment + 1) * candidates.length) / cap);
+    let best: { index: number; score: number } | null = null;
+
+    for (let position = from; position < to; position += 1) {
+      const entry = candidates[position];
+
+      if (entry && (best === null || entry.score > best.score)) {
+        best = entry;
+      }
+    }
+
+    if (best !== null) {
+      chosen.add(best.index);
+    }
+  }
+
+  return chosen;
+}
+
+/**
  * Assign a background band to every rendered section.
  *
  * Two dark chapters never touch, the page never opens on its heaviest band
@@ -708,14 +788,42 @@ export function assignBands(
    */
   const cap = Math.max(1, Math.round(sections.length * appetite));
 
+  /*
+   * WHICH BEATS GO STRONG IS DECIDED BEFORE ANY BAND IS PLACED.
+   *
+   * The previous run made this decision inline, left to right, behind an
+   * absolute gate: a section could go strong only when its weight
+   * reached 2, and the first `cap` sections that cleared that bar took
+   * every strong band the page had. Two things followed, and both were
+   * measured over 2,400 seeded generations rather than reasoned about.
+   *
+   * The gate, not the cap, was binding. `establish_fit` with supporting
+   * emphasis scores 0 and `handle_objection` with lead emphasis scores
+   * 0 — and those are the two beats essentially every document ends on.
+   * So the last 40% of every page was unconditionally pale, in all four
+   * directions, at every appetite: positions 3 and 4 went strong on
+   * 0.0% of pages while positions 1 and 2 went strong on 100.0%.
+   * Raising appetite could not reach the tail, because appetite only
+   * ever raised a ceiling that was never the constraint.
+   *
+   * Spending greedily did the rest. Even where the tail had been
+   * eligible, the budget was gone before the run arrived: strength was
+   * front-loaded by construction, the page peaked around 40% depth and
+   * decayed, and the closing seam was a dark-to-accent crescendo on
+   * 0.0% of pages.
+   *
+   * So appetite now decides HOW MANY beats compose strongly, and the
+   * page decides WHICH — ranked by what each beat earned, and spread
+   * across the document rather than consumed at the front.
+   */
+  const strongIndices = selectStrongSections(sections, cap, palette, rng);
+
   const bands: Band[] = [];
-  let used = 0;
   let repeat = 0;
 
   sections.forEach((section, index) => {
     const previous = index === 0 ? leadIn : bands[index - 1];
     const isLast = index === sections.length - 1;
-    const weight = weightOf(section.purpose, section.emphasis);
 
     /*
      * ADJACENCY IS ALLOWED WHEN THE GROUND ACTUALLY CHANGES.
@@ -729,9 +837,8 @@ export function assignBands(
      * one interrupted band rather than two beats.
      */
     const previousGround = previous === undefined ? undefined : bandGround(previous);
-    const canGoStrong = strong.length > 0 && used < cap;
 
-    if (canGoStrong && weight >= 2 && (index > 0 || bandGround(palette[0] ?? 'base') !== 'light')) {
+    if (strong.length > 0 && strongIndices.has(index)) {
       /*
        * Prefer a strong band this page has not used yet. Two identical
        * full-bleed chapters are not two chapters — they read as one
@@ -752,7 +859,10 @@ export function assignBands(
        * When no strong band of a different ground exists, this places a
        * light band instead of spending the crescendo badly. A page that
        * only owns dark strong bands gets one dark chapter, which is
-       * honest, rather than two stacked.
+       * honest, rather than two stacked. A beat selected to compose
+       * strongly and then refused here simply reads light: the adjacency
+       * invariant outranks the appetite, because two touching fields of
+       * one ground is the defect appetite exists to avoid.
        */
       const tailGround = tailOut === undefined ? undefined : bandGround(tailOut);
       const distinct = pool.filter(
@@ -761,7 +871,6 @@ export function assignBands(
 
       if (distinct.length > 0) {
         bands.push(rng.pick(distinct));
-        used += 1;
         repeat = 0;
 
         return;

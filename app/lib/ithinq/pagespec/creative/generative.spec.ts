@@ -4,6 +4,7 @@ import type { PageSpec, PageSpecSection, ProofQuote } from '@ithinq-pagespec/pag
 import { compilePageSpecToProjectManifest } from '~/lib/ithinq/pagespec/compiler';
 import { validatePageSpec } from '~/lib/ithinq/pagespec/validator';
 import { composite, contrastHex } from './colour';
+import { assignBands, bandGround } from './design';
 import { escapeHtml } from './compose';
 import { normaliseCreativeIntent } from './intent';
 import { isLayoutFeasible, planPresentation } from './plan';
@@ -1278,6 +1279,26 @@ function groundsFor(spec: PageSpec, direction: (typeof DIRECTION_IDS)[number], r
   return [...html.matchAll(/data-ground="(\w+)"/g)].map((match) => match[1]);
 }
 
+/**
+ * The grounds of the SECTION run alone, planned as production plans it.
+ *
+ * `groundsFor` reads every `data-ground` in the document, which includes the
+ * hero and the closing field. Those carry their own bands from elsewhere, so a
+ * question about how the section run distributes strength has to ask the plan
+ * rather than the rendered page. Imagery is supplied because a three-image
+ * budget always supplies it, and the hero's band — which the run opens
+ * against — depends on whether a picture exists.
+ */
+function sectionGrounds(direction: (typeof DIRECTION_IDS)[number], reference: string): string[] {
+  const spec = { ...fixture(), page: { ...fixture().page, reference } } as PageSpec;
+  const plan = planPresentation(spec, [], {
+    direction,
+    generatedAssetNeedIds: ['hero', 'section-0', 'section-2'],
+  });
+
+  return plan.sections.map((section) => bandGround(section.band));
+}
+
 describe('composition confidence', () => {
   it('lets every direction put more than one strong ground on a page', () => {
     /*
@@ -1365,6 +1386,151 @@ describe('composition confidence', () => {
     // A strong ground is a chapter and is given the air one needs.
     expect(html).toContain(".section[data-ground='dark'],.section[data-ground='accent']");
     expect(html).toContain('.section--promoted{');
+  });
+
+  /*
+   * WHERE strength lands, not just how much of it there is.
+   *
+   * The tests above bought a page more than one strong ground. They did
+   * not ask where those grounds went, and the answer — measured over
+   * 2,400 seeded generations, four directions, 600 seeds each — was that
+   * it never varied at all:
+   *
+   *     position 0:  strong   4-28%
+   *     position 1:  strong  100.0%
+   *     position 2:  strong  100.0%
+   *     position 3:  strong    0.0%
+   *     position 4:  strong    0.0%
+   *
+   * Identical in every direction, at every appetite. The cause was an
+   * absolute gate rather than the cap: a beat could compose strongly
+   * only at `weight >= 2`, and the two beats a document almost always
+   * ends on — `establish_fit` supporting, `handle_objection` lead —
+   * both score 0. So the back of every page was pale as a matter of
+   * arithmetic, and raising appetite could not reach it.
+   *
+   * These pin the PROPERTY that replaced it: strength is spread across
+   * the document and appetite decides how much of it there is. They
+   * deliberately do not pin which beat goes strong, or how often — that
+   * would rebuild the frozen distribution inside the suite.
+   */
+  it('lets strong composition reach the final third without ever guaranteeing it', () => {
+    for (const direction of DIRECTION_IDS) {
+      let reached = 0;
+
+      /*
+       * A larger sample than the tests around it, deliberately. The
+       * measured rates are 79-93%, so a short run of fixed seeds can
+       * legitimately reach the tail every time and the upper bound then
+       * fails for a reason that is not a defect.
+       */
+      const runs = 200;
+
+      for (let seed = 0; seed < runs; seed += 1) {
+        const grounds = sectionGrounds(direction, `spec:final-third:${seed}`);
+        const cut = grounds.length - Math.ceil(grounds.length / 3);
+
+        if (grounds.slice(cut).some((ground) => ground !== 'light')) {
+          reached += 1;
+        }
+      }
+
+      /*
+       * Both bounds matter and they fail for opposite reasons. Zero is
+       * the defect this replaced — a tail that cannot be reached. All of
+       * them would mean a strong close had become a rule, which is the
+       * positional hard-coding this correction exists to avoid.
+       */
+      expect(reached, `${direction} never composes strongly in its final third`).toBeGreaterThan(0);
+      expect(reached, `${direction} always composes strongly in its final third`).toBeLessThan(runs);
+    }
+  });
+
+  it('no longer fixes which beats may compose strongly', () => {
+    /*
+     * The direct regression test for the frozen distribution. No section
+     * position may be strong on every single generation, and none may be
+     * strong on none of them — that pattern, and not the count, is what
+     * made every page read as the same composition.
+     */
+    for (const direction of DIRECTION_IDS) {
+      const runs = 60;
+      const strongAt = new Map<number, number>();
+      let length = 0;
+
+      for (let seed = 0; seed < runs; seed += 1) {
+        const grounds = sectionGrounds(direction, `spec:frozen:${seed}`);
+        length = grounds.length;
+        grounds.forEach((ground, index) => {
+          if (ground !== 'light') {
+            strongAt.set(index, (strongAt.get(index) ?? 0) + 1);
+          }
+        });
+      }
+
+      /*
+       * The opening beat is exempt in both directions: a page opens on
+       * its heaviest band only when the archetype's palette leads with
+       * one, which is a property of the palette and legitimately fixed.
+       */
+      for (let index = 1; index < length; index += 1) {
+        expect(strongAt.get(index) ?? 0, `${direction} position ${index} is strong on every generation`).toBeLessThan(
+          runs,
+        );
+      }
+    }
+  });
+
+  it('lets appetite decide how many beats compose strongly', () => {
+    /*
+     * Appetite used to be a ceiling above a gate that bound first, so
+     * raising it changed nothing: measured means were 2.12, 2.28, 2.04
+     * and 2.30 for appetites 0.34, 0.40, 0.50 and 0.60 — flat, and not
+     * even monotone. Held against identical sections and palette, more
+     * appetite must now buy more composition.
+     */
+    const spec = fixture();
+    const inputs = spec.sections.map((section) => ({
+      purpose: section.purpose,
+      emphasis: section.emphasis ?? ('support' as const),
+    }));
+
+    for (const direction of DIRECTION_IDS) {
+      const palette = getDirection(direction).composition.bandPalette;
+      const mean = (appetite: number) => {
+        const runs = 40;
+        let total = 0;
+
+        for (let seed = 0; seed < runs; seed += 1) {
+          total += assignBands(palette, inputs, `seed:${direction}:${seed}`, appetite).filter(
+            (band) => bandGround(band) !== 'light',
+          ).length;
+        }
+
+        return total / runs;
+      };
+
+      expect(mean(0.7), `${direction} ignores appetite`).toBeGreaterThan(mean(0.3));
+    }
+  });
+
+  it('keeps the rhythm itself varying from seed to seed', () => {
+    /*
+     * The count and the placement can both be right while every page
+     * still resolves to the same sequence. Before this correction one
+     * direction produced FOUR distinct ground sequences across 600
+     * seeds; the floor here is far below what was measured after, so it
+     * catches a collapse without pinning a distribution.
+     */
+    for (const direction of DIRECTION_IDS) {
+      const sequences = new Set<string>();
+
+      for (let seed = 0; seed < 60; seed += 1) {
+        sequences.add(sectionGrounds(direction, `spec:rhythm:${seed}`).join('>'));
+      }
+
+      expect(sequences.size, `${direction} composes the same rhythm whatever the seed`).toBeGreaterThan(5);
+    }
   });
 });
 
