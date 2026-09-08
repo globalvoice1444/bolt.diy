@@ -1249,3 +1249,121 @@ describe('a long FAQ is still a designed FAQ', () => {
     expect(stylesheet).toContain('nth-last-child(n+9)');
   });
 });
+
+/*
+ * COMPOSITION CONFIDENCE (Round 5).
+ *
+ * Owner acceptance: the page was clean, competent, and read as generated
+ * SaaS rather than an agency-designed sales page. The measured causes
+ * were all ceilings in this file's neighbours rather than anything about
+ * the content:
+ *
+ *   - `assignBands` capped strong ground at `floor(sections / 3)`,
+ *     network-wide. A five-section page got exactly ONE.
+ *   - Three of the four archetypes carried a single strong band in their
+ *     palette, so that one band was always the same treatment.
+ *   - A strong band could never follow a strong band, which forced
+ *     strict alternation and read as a metronome.
+ *   - Every section had identical `padding-block`, so five beats became
+ *     five stacked blocks whatever they were doing.
+ *
+ * These tests pin the properties that were bought, not the specific
+ * bands — pinning the sequence would replace one ceiling with another.
+ */
+function groundsFor(spec: PageSpec, direction: (typeof DIRECTION_IDS)[number], reference: string): string[] {
+  const one = { ...spec, page: { ...spec.page, reference } } as PageSpec;
+  const { manifest } = compilePageSpecToProjectManifest(one, { direction });
+  const html = Object.values(manifest.files)[0] ?? '';
+
+  return [...html.matchAll(/data-ground="(\w+)"/g)].map((match) => match[1]);
+}
+
+describe('composition confidence', () => {
+  it('lets every direction put more than one strong ground on a page', () => {
+    /*
+     * The ceiling this replaces was absolute: one strong band per three
+     * sections, for every direction, however bold. `clinical-calm` — the
+     * archetype a dental page resolves to — measured ONE strong ground
+     * on the whole document.
+     */
+    for (const direction of DIRECTION_IDS) {
+      const best = ['spec:a', 'spec:b', 'spec:c'].map(
+        (reference) => groundsFor(fixture(), direction, reference).filter((ground) => ground !== 'light').length,
+      );
+
+      expect(Math.max(...best), `${direction} never composes beyond one strong ground`).toBeGreaterThan(1);
+    }
+  });
+
+  it('never places the same strong ground twice running', () => {
+    /*
+     * The rule that replaced strict alternation. `deep` and `inverted`
+     * are different bands and BOTH dark, so the test that matters is on
+     * the ground rather than the band — filtering on the band let two
+     * dark chapters sit together and read as one interrupted field.
+     */
+    for (const direction of DIRECTION_IDS) {
+      for (const reference of ['spec:a', 'spec:b', 'spec:c', 'spec:d']) {
+        const grounds = groundsFor(fixture(), direction, reference);
+
+        for (let index = 1; index < grounds.length - 1; index += 1) {
+          if (grounds[index] === 'light') {
+            continue;
+          }
+
+          /*
+           * The final pair is exempt: the footer deliberately continues
+           * the closing band so the page resolves on one field, which is
+           * the clean edge Round 4 delivered.
+           */
+          expect(grounds[index], `${direction}/${reference} repeats ${grounds[index]}`).not.toBe(grounds[index - 1]);
+        }
+      }
+    }
+  });
+
+  it('still gives two directions materially different compositions', () => {
+    /*
+     * Confidence must not collapse into one house style. The point of
+     * raising the ceiling is more range, not a single louder default.
+     */
+    const calm = groundsFor(fixture(), 'clinical-calm', 'spec:a').join(',');
+    const bold = groundsFor(fixture(), 'service-bold', 'spec:a').join(',');
+
+    expect(calm).not.toBe(bold);
+  });
+
+  it('still lets two generations of one direction diverge', () => {
+    const runs = ['spec:a', 'spec:b', 'spec:c', 'spec:d'].map((reference) =>
+      groundsFor(fixture(), 'conversion-modern', reference).join(','),
+    );
+
+    expect(new Set(runs).size).toBeGreaterThan(1);
+  });
+
+  it('gives the hero a display size that can actually carry it', () => {
+    /*
+     * The cap used to be 6.1rem and most directions never approached it
+     * — clinical-calm resolved to 4.1rem, which is a headline that fills
+     * its measure without ever dominating the screen. The exponent is
+     * unchanged, so the ratios between h1, h2 and body are the same
+     * system; only the top of the scale moved.
+     */
+    for (const direction of DIRECTION_IDS) {
+      const { manifest } = compilePageSpecToProjectManifest(fixture(), { direction });
+      const html = Object.values(manifest.files)[0] ?? '';
+      const size = Number(/--size-h1:([\d.]+)rem/.exec(html)?.[1] ?? '0');
+
+      expect(size, `${direction} h1`).toBeGreaterThanOrEqual(4.5);
+    }
+  });
+
+  it('does not give every section the same vertical rhythm', () => {
+    const { manifest } = compilePageSpecToProjectManifest(fixture(), { direction: 'service-bold' });
+    const html = Object.values(manifest.files)[0] ?? '';
+
+    // A strong ground is a chapter and is given the air one needs.
+    expect(html).toContain(".section[data-ground='dark'],.section[data-ground='accent']");
+    expect(html).toContain('.section--promoted{');
+  });
+});

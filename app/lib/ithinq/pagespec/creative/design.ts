@@ -531,6 +531,14 @@ export function synthesiseComposition(
     heroVariants: varyHeroVariants(policy.heroVariants, rng),
     contentWidth: rng.chance(0.75) ? policy.contentWidth : policy.contentWidth === 'narrow' ? 'wide' : 'narrow',
     bandPalette: policy.bandPalette,
+
+    /*
+     * Appetite varies per generation like everything else here, so two
+     * pages in the same direction still diverge — one composes a little
+     * harder than the other. The floor keeps even the calmest page from
+     * falling back to the single-strong-band composition this replaced.
+     */
+    bandAppetite: Math.max(0.3, policy.bandAppetite + rng.pick([-0.08, 0, 0, 0.08, 0.12])),
     chapterEvery:
       policy.chapterEvery === null ? (rng.chance(0.3) ? 3 : null) : rng.chance(0.8) ? policy.chapterEvery : null,
     alternate: rng.chance(0.82) ? policy.alternate : !policy.alternate,
@@ -623,21 +631,68 @@ export interface BandInput {
  * relative to the document's length — a page that is dark everywhere has no
  * chapters at all.
  */
-export function assignBands(palette: readonly Band[], sections: readonly BandInput[], seed: string): Band[] {
+export function assignBands(
+  palette: readonly Band[],
+  sections: readonly BandInput[],
+  seed: string,
+  appetite = 0.34,
+
+  /*
+   * What the run opens against and what it closes into. The hero and the
+   * closing panel carry their own bands, decided elsewhere, and without
+   * them this run could place a dark first section under a dark hero —
+   * two fields meeting with no seam, which is precisely the adjacency
+   * the run forbids internally.
+   */
+  leadIn?: Band,
+  tailOut?: Band,
+): Band[] {
   const rng = new Rng(`${seed}|bands`);
   const strong = palette.filter((band) => bandGround(band) !== 'light');
   const light = palette.filter((band) => bandGround(band) === 'light');
   const lightPool = light.length > 0 ? light : (['base'] as const);
-  const cap = Math.max(1, Math.floor(sections.length / 3));
+
+  /*
+   * HOW MANY STRONG BANDS THIS PAGE MAY SPEND.
+   *
+   * This was `floor(sections.length / 3)`, a network-wide constant, so a
+   * five-section page got exactly ONE strong band no matter which
+   * direction was designing it — and three of the four archetypes
+   * carried only one strong band in their palette anyway, so that one
+   * was always the same treatment. The measured result was a page whose
+   * body was uniformly light except for a single dark chapter, which is
+   * what "competent generated SaaS" looks like: orderly, and with
+   * nothing on it that took a position.
+   *
+   * Appetite belongs to the direction because confidence is a property
+   * of the art direction, not of how many beats the argument happened
+   * to need. A calm clinical page still composes calmly; a bold one now
+   * actually gets to be bold.
+   */
+  const cap = Math.max(1, Math.round(sections.length * appetite));
 
   const bands: Band[] = [];
   let used = 0;
   let repeat = 0;
 
   sections.forEach((section, index) => {
-    const previous = bands[index - 1];
+    const previous = index === 0 ? leadIn : bands[index - 1];
+    const isLast = index === sections.length - 1;
     const weight = weightOf(section.purpose, section.emphasis);
-    const canGoStrong = strong.length > 0 && used < cap && (previous === undefined || bandGround(previous) === 'light');
+
+    /*
+     * ADJACENCY IS ALLOWED WHEN THE GROUND ACTUALLY CHANGES.
+     *
+     * The old rule refused any strong band after a strong band, which
+     * enforced strict alternation and made the page read as a metronome:
+     * light, dark, light, light. A dark chapter running into an accent
+     * statement is a crescendo and one of the few moves that reads as
+     * composed rather than assembled. What stays forbidden is the thing
+     * that actually looked broken — the SAME field twice, which reads as
+     * one interrupted band rather than two beats.
+     */
+    const previousGround = previous === undefined ? undefined : bandGround(previous);
+    const canGoStrong = strong.length > 0 && used < cap;
 
     if (canGoStrong && weight >= 2 && (index > 0 || bandGround(palette[0] ?? 'base') !== 'light')) {
       /*
@@ -647,12 +702,33 @@ export function assignBands(palette: readonly Band[], sections: readonly BandInp
        * earned.
        */
       const unused = strong.filter((band) => !bands.includes(band));
+      const pool = unused.length > 0 ? unused : strong;
 
-      bands.push(rng.pick(unused.length > 0 ? unused : strong));
-      used += 1;
-      repeat = 0;
+      /*
+       * NEVER THE SAME GROUND TWICE RUNNING, and the fallback matters as
+       * much as the rule. `deep` and `inverted` are different bands but
+       * both are dark, so filtering on the BAND let two dark chapters sit
+       * together and read as one interrupted field — the exact thing the
+       * old strict-alternation rule existed to prevent. Filtering on the
+       * GROUND is the correct test.
+       *
+       * When no strong band of a different ground exists, this places a
+       * light band instead of spending the crescendo badly. A page that
+       * only owns dark strong bands gets one dark chapter, which is
+       * honest, rather than two stacked.
+       */
+      const tailGround = tailOut === undefined ? undefined : bandGround(tailOut);
+      const distinct = pool.filter(
+        (band) => bandGround(band) !== previousGround && !(isLast && bandGround(band) === tailGround),
+      );
 
-      return;
+      if (distinct.length > 0) {
+        bands.push(rng.pick(distinct));
+        used += 1;
+        repeat = 0;
+
+        return;
+      }
     }
 
     let choice = rng.pick(lightPool);

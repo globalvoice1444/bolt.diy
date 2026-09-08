@@ -37,7 +37,17 @@ function typeScale(design: PageDesign): Record<string, string> {
   const { scale } = design.typography;
 
   return {
-    '--size-h1': rem(2.05 * scale ** 3, 3.3, 6.1),
+    /*
+     * THE DISPLAY STEP CARRIES THE HERO, and it was set for a page that
+     * had to stay polite. A cap of 6.1rem that most directions never
+     * reached — clinical-calm resolved to 4.1rem — is a headline that
+     * fills its measure without ever dominating the screen, which is
+     * what "conservative hero" measures as. The exponent is unchanged,
+     * so the RATIOS of the scale are untouched and the relationship
+     * between h1, h2 and body is the same typographic system; only the
+     * top of it moves.
+     */
+    '--size-h1': rem(2.35 * scale ** 3, 3.8, 7.0),
     '--size-h1-min': rem(1.5 * scale, 1.9, 2.7),
     '--size-h2': rem(1.55 * scale ** 2, 2.1, 4.1),
     '--size-h2-min': rem(1.15 * scale, 1.45, 2.05),
@@ -45,7 +55,7 @@ function typeScale(design: PageDesign): Record<string, string> {
     '--size-lede': rem(0.98 * scale, 1.2, 1.62),
     '--size-body': rem(0.79 * scale, 1.0, 1.19),
     '--size-eyebrow': rem(0.56 * scale, 0.72, 0.86),
-    '--size-statement': rem(1.32 * scale ** 2, 1.8, 3.5),
+    '--size-statement': rem(1.46 * scale ** 2, 2.0, 4.0),
   };
 }
 
@@ -179,6 +189,23 @@ a{color:inherit}
 
 /* ---- rhythm -------------------------------------------------------- */
 .section{padding-block:calc(clamp(40px,5.4vw,104px) * var(--rhythm) * var(--density));position:relative;isolation:isolate}
+/* SECTION RHYTHM IS NOT UNIFORM. Every section used to breathe by
+   exactly the same amount, so a page of five beats read as five stacked
+   blocks whatever those beats were doing — the metronome that made a
+   composed page feel assembled. A strong ground is a chapter and gets
+   the air a chapter needs; a promoted beat gets more than a supporting
+   one. The multipliers stay modest so this reads as rhythm rather than
+   as sections falling apart. */
+.section[data-ground='dark'],.section[data-ground='accent']{
+  padding-block:calc(clamp(40px,5.4vw,104px) * var(--rhythm) * var(--density) * 1.45)}
+.section--promoted{padding-block:calc(clamp(40px,5.4vw,104px) * var(--rhythm) * var(--density) * 1.2)}
+.section--promoted[data-ground='dark'],.section--promoted[data-ground='accent']{
+  padding-block:calc(clamp(40px,5.4vw,104px) * var(--rhythm) * var(--density) * 1.6)}
+/* Two strong grounds meeting is a deliberate crescendo, so the seam
+   between them closes up rather than doubling the gap. */
+.section[data-ground='dark'] + .section[data-ground='accent'],
+.section[data-ground='accent'] + .section[data-ground='dark']{padding-top:calc(
+  clamp(40px,5.4vw,104px) * var(--rhythm) * var(--density) * .9)}
 .shell{width:min(100% - clamp(32px,7vw,120px),var(--container));margin-inline:auto;position:relative;z-index:1}
 .shell--narrow > *{max-width:min(100%,980px)}
 .shell--full{width:100%}
