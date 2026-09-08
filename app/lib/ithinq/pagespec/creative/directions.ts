@@ -1,4 +1,7 @@
 import type {
+  ItemRhythm,
+  MediaAspect,
+  MediaFraming,
   BackgroundTreatment,
   Band,
   CardStyle,
@@ -127,6 +130,22 @@ export interface CompositionPolicy {
    * image-led the brief was.
    */
   mediaLayouts: readonly SectionLayout[];
+
+  /**
+   * This direction's own way of framing a picture.
+   *
+   * Every direction previously carried the SAME four media layouts in a
+   * different order, so no direction had an image language of its own —
+   * the strongest single reason imagery read as placed rather than
+   * art-directed. Framing is where that divergence now lives.
+   */
+  mediaFramings: readonly MediaFraming[];
+
+  /** The crops this direction reaches for. */
+  mediaAspects: readonly MediaAspect[];
+
+  /** How willing this direction is to weight items unequally. */
+  itemRhythms: readonly ItemRhythm[];
   cardStyle: CardStyle;
   ctaTreatment: CtaTreatment;
   motion: MotionLevel;
@@ -187,7 +206,7 @@ const editorialLuxe: CreativeDirection = {
     intensity: 0.4,
   },
   composition: {
-    heroVariants: ['split-media', 'editorial-stack', 'asymmetric-offset'],
+    heroVariants: ['split-media', 'editorial-stack', 'full-bleed-media', 'asymmetric-offset'],
     contentWidth: 'narrow',
     bandPalette: ['base', 'base', 'tint', 'deep', 'wash', 'accent'],
     bandAppetite: 0.4,
@@ -205,6 +224,9 @@ const editorialLuxe: CreativeDirection = {
       default: ['chapter-opener', 'editorial-prose'],
     },
     mediaLayouts: ['editorial-split', 'poster-frame', 'showcase-panel', 'media-full-bleed'],
+    mediaFramings: ['contained', 'bleed-right', 'overlap', 'oversized'],
+    mediaAspects: ['portrait', 'landscape', 'native'],
+    itemRhythms: ['lead', 'even', 'staggered'],
     cardStyle: 'flat',
     ctaTreatment: 'quiet',
     motion: 'subtle',
@@ -261,7 +283,7 @@ const conversionModern: CreativeDirection = {
     intensity: 0.55,
   },
   composition: {
-    heroVariants: ['split-media', 'offset-panel', 'framed-plate'],
+    heroVariants: ['split-media', 'full-bleed-media', 'offset-panel', 'framed-plate'],
     contentWidth: 'wide',
     bandPalette: ['base', 'raised', 'deep', 'wash', 'accent', 'tint', 'inverted'],
     bandAppetite: 0.5,
@@ -279,6 +301,9 @@ const conversionModern: CreativeDirection = {
       default: ['display-statement', 'editorial-prose'],
     },
     mediaLayouts: ['showcase-panel', 'media-full-bleed', 'editorial-split', 'poster-frame'],
+    mediaFramings: ['oversized', 'bleed-left', 'contained', 'overlap'],
+    mediaAspects: ['landscape', 'panorama', 'square'],
+    itemRhythms: ['lead', 'staggered', 'even'],
     cardStyle: 'elevated',
     ctaTreatment: 'banner',
     motion: 'subtle',
@@ -332,7 +357,7 @@ const serviceBold: CreativeDirection = {
     intensity: 0.8,
   },
   composition: {
-    heroVariants: ['offset-panel', 'centered-statement', 'full-bleed-media', 'asymmetric-offset'],
+    heroVariants: ['offset-panel', 'centered-statement', 'full-bleed-media', 'split-media', 'asymmetric-offset'],
     contentWidth: 'wide',
     bandPalette: ['inverted', 'base', 'accent', 'base', 'deep'],
     bandAppetite: 0.6,
@@ -350,6 +375,9 @@ const serviceBold: CreativeDirection = {
       default: ['display-statement', 'editorial-prose'],
     },
     mediaLayouts: ['media-full-bleed', 'poster-frame', 'editorial-split', 'showcase-panel'],
+    mediaFramings: ['bleed-left', 'oversized', 'bleed-right', 'overlap'],
+    mediaAspects: ['panorama', 'landscape', 'square'],
+    itemRhythms: ['staggered', 'lead', 'even'],
     cardStyle: 'inverted',
     ctaTreatment: 'split',
     motion: 'expressive',
@@ -404,7 +432,7 @@ const clinicalCalm: CreativeDirection = {
     intensity: 0.35,
   },
   composition: {
-    heroVariants: ['centered-statement', 'split-media', 'framed-plate'],
+    heroVariants: ['centered-statement', 'split-media', 'full-bleed-media', 'framed-plate'],
     contentWidth: 'narrow',
     bandPalette: ['base', 'tint', 'deep', 'wash', 'raised', 'accent'],
     bandAppetite: 0.34,
@@ -422,6 +450,9 @@ const clinicalCalm: CreativeDirection = {
       default: ['chapter-opener', 'editorial-prose'],
     },
     mediaLayouts: ['editorial-split', 'showcase-panel', 'poster-frame', 'media-full-bleed'],
+    mediaFramings: ['contained', 'overlap', 'bleed-right', 'oversized'],
+    mediaAspects: ['square', 'portrait', 'native'],
+    itemRhythms: ['even', 'lead', 'staggered'],
     cardStyle: 'outlined',
     ctaTreatment: 'inline',
     motion: 'subtle',

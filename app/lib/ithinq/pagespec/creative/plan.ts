@@ -9,7 +9,16 @@ import {
   type PageCreativeIntent,
 } from './intent';
 import { Rng } from './seed';
-import { DIRECTION_IDS, type Band, type DirectionId, type HeroVariant, type SectionLayout } from './types';
+import {
+  DIRECTION_IDS,
+  type Band,
+  type DirectionId,
+  type HeroVariant,
+  type ItemRhythm,
+  type MediaAspect,
+  type MediaFraming,
+  type SectionLayout,
+} from './types';
 import type {
   ClosingPresentation,
   CreativePresentationPlan,
@@ -362,12 +371,38 @@ function needsMedia(variant: HeroVariant): boolean {
  * would leave the strategy's own asset unused and quietly turn an
  * image-forward brief into a typographic page.
  */
-function resolveHeroVariant(variants: readonly HeroVariant[], hasMedia: boolean): HeroVariant {
+function resolveHeroVariant(variants: readonly HeroVariant[], hasMedia: boolean, rng: Rng): HeroVariant {
   if (hasMedia) {
-    const mediaVariant = variants.find(needsMedia);
+    /*
+     * THE HERO PICTURE HAD ONE TREATMENT PER DIRECTION.
+     *
+     * This took `variants.find(needsMedia)` — the FIRST media variant —
+     * and `varyHeroVariants` deliberately holds media variants in place,
+     * so with a picture available (which a three-image budget always
+     * makes true) the hero was deterministic: three of the four
+     * directions produced `split-media` on every generation, measured at
+     * 18 of 24. An image beside text is the most conventional
+     * arrangement there is, and it was the page's largest image moment.
+     *
+     * Choosing among the media variants keeps the direction's own first
+     * choice most likely — the draw is square-weighted, as everywhere
+     * else here — while letting the same direction open on a full-bleed
+     * picture instead. It is variation, not a different formula.
+     */
+    const mediaVariants = variants.filter(needsMedia);
 
-    if (mediaVariant) {
-      return mediaVariant;
+    if (mediaVariants.length > 0) {
+      /*
+       * A gentler draw than the square-weighted one used for long
+       * preference lists. There are only ever two media heroes, and
+       * squaring over two options lands on the first about 85% of the
+       * time — which is variation on paper and a fixed hero in practice.
+       * Roughly three in five keeps the direction's own choice clearly
+       * dominant while making the other a real outcome.
+       */
+      const index = rng.next() < 0.6 ? 0 : 1 + Math.floor(rng.next() * (mediaVariants.length - 1));
+
+      return mediaVariants[Math.min(index, mediaVariants.length - 1)] as HeroVariant;
     }
   }
 
@@ -469,7 +504,7 @@ export function planPresentation(
   const generated = new Set(options.generatedAssetNeedIds ?? []);
   const heroAssetIndex = findHeroAssetIndex(spec, skip);
   const heroHasGenerated = generated.has('hero');
-  const heroVariant = resolveHeroVariant(policy.heroVariants, heroAssetIndex !== null || heroHasGenerated);
+  const heroVariant = resolveHeroVariant(policy.heroVariants, heroAssetIndex !== null || heroHasGenerated, rng);
   const heroWantsMedia = needsMedia(heroVariant);
   const heroUsesMedia = heroWantsMedia && (heroAssetIndex !== null || heroHasGenerated);
 
@@ -574,6 +609,42 @@ export function planPresentation(
     const band: Band = layout === 'poster-frame' ? 'inverted' : (bands[position] ?? 'base');
     const chapterStart = policy.chapterEvery !== null && position > 0 && position % policy.chapterEvery === 0;
 
+    /*
+     * FRAMING, CROP AND ITEM RHYTHM.
+     *
+     * These are the three axes that turn a placed rectangle into an
+     * art-directed picture, and an orderly card row into a composition
+     * with a point of view. They multiply the layouts rather than adding
+     * more of them: four media layouts times five framings times five
+     * crops is a far wider space than nine layouts would be, and none of
+     * it is a new template somebody has to fill.
+     */
+    const framing: MediaFraming =
+      media === 'none' || media === 'full-bleed'
+        ? 'contained'
+        : (policy.mediaFramings[(position + splitOccurrence) % policy.mediaFramings.length] ?? 'contained');
+
+    const aspect: MediaAspect =
+      media === 'none'
+        ? 'native'
+        : media === 'full-bleed'
+          ? 'panorama'
+          : (policy.mediaAspects[position % policy.mediaAspects.length] ?? 'native');
+
+    /*
+     * Hierarchy is earned, not spread evenly. A promoted beat is one the
+     * strategy already said carries weight, so it gets a rhythm that says
+     * which of its items leads; a supporting beat with a long flat list
+     * stays even, because inventing a hierarchy the content does not have
+     * is just decoration.
+     */
+    const rhythm: ItemRhythm =
+      itemCount(section) < 3
+        ? 'even'
+        : promoted || emphasis === 'lead'
+          ? (policy.itemRhythms[0] ?? 'lead')
+          : (policy.itemRhythms[(position + 1) % policy.itemRhythms.length] ?? 'even');
+
     sections.push({
       sourceIndex,
       kind: section.kind,
@@ -582,6 +653,9 @@ export function planPresentation(
       layout,
       band,
       ground: bandGround(band),
+      framing,
+      aspect,
+      rhythm,
       width: promoted ? 'wide' : policy.contentWidth,
       media,
       mirrored,

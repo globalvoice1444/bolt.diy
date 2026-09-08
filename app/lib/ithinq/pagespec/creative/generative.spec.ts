@@ -1367,3 +1367,185 @@ describe('composition confidence', () => {
     expect(html).toContain('.section--promoted{');
   });
 });
+
+/*
+ * ART DIRECTION AND CAPABILITY HIERARCHY (Round 6).
+ *
+ * Owner acceptance: imagery behaved like placed content rather than part
+ * of the composition, and capabilities read as orderly rows. Both were
+ * measured ceilings, not judgement calls:
+ *
+ *   - PLACEMENT WAS THE ONLY IMAGE AXIS. Four media layouts, shared
+ *     identically by all four directions in a different order, so no
+ *     direction had an image language and every picture was a rectangle
+ *     inside the shell beside some text.
+ *   - THE HERO WAS DETERMINISTIC. `resolveHeroVariant` took the FIRST
+ *     media variant and `varyHeroVariants` pins media variants in place,
+ *     so three directions produced `split-media` on every generation —
+ *     18 of 24 measured, on the page's largest image moment.
+ *   - EVERY ITEM WEIGHED THE SAME. A capability section rendered N
+ *     interchangeable cards, so it could be perfectly scannable and
+ *     still say nothing about which capability mattered.
+ *
+ * These tests pin REACHABILITY and VARIATION, never a specific framing
+ * or rhythm for a specific section. Pinning the choice would rebuild the
+ * ceiling in the test suite.
+ */
+function planFor(spec: PageSpec, direction: (typeof DIRECTION_IDS)[number], reference: string) {
+  const one = { ...spec, page: { ...spec.page, reference } } as PageSpec;
+
+  return planPresentation(one, [], {
+    direction,
+    generatedAssetNeedIds: ['hero', 'section-1', 'section-2'],
+  });
+}
+
+const REFERENCES = ['spec:a', 'spec:b', 'spec:c', 'spec:d', 'spec:e', 'spec:f'];
+
+describe('art direction', () => {
+  it('keeps several distinct image treatments reachable', () => {
+    const treatments = new Set<string>();
+
+    for (const direction of DIRECTION_IDS) {
+      for (const reference of REFERENCES) {
+        for (const section of planFor(fixture(), direction, reference).sections) {
+          if (section.media !== 'none') {
+            treatments.add(`${section.framing}/${section.aspect}`);
+          }
+        }
+      }
+    }
+
+    /*
+     * Framing multiplies the existing layouts rather than adding more of
+     * them, so the space is far wider than a layout list would be.
+     */
+    expect(treatments.size).toBeGreaterThan(6);
+  });
+
+  it('no longer gives the hero one treatment per direction', () => {
+    /*
+     * Asserted over the whole space rather than per direction. The draw
+     * is weighted so a direction's own hero clearly dominates — that is
+     * what keeps it recognisable — so any single direction can legitimately
+     * return the same variant across a handful of seeds. What must not
+     * happen, and previously always did, is the hero being FIXED by the
+     * direction the moment a picture exists.
+     */
+    const wide = [...REFERENCES, 'spec:g', 'spec:h', 'spec:i', 'spec:j', 'spec:k', 'spec:l'];
+    const variants = new Set<string>();
+    let varyingDirections = 0;
+
+    for (const direction of DIRECTION_IDS) {
+      const perDirection = new Set(wide.map((reference) => planFor(fixture(), direction, reference).hero.variant));
+
+      perDirection.forEach((variant) => variants.add(variant));
+
+      if (perDirection.size > 1) {
+        varyingDirections += 1;
+      }
+    }
+
+    expect(variants.size).toBeGreaterThan(1);
+    expect(varyingDirections).toBeGreaterThan(1);
+  });
+
+  it('lets two directions frame the same page differently', () => {
+    const shape = (direction: (typeof DIRECTION_IDS)[number]): string =>
+      planFor(fixture(), direction, 'spec:a')
+        .sections.map((section) => `${section.framing}/${section.aspect}`)
+        .join(',');
+
+    expect(shape('clinical-calm')).not.toBe(shape('service-bold'));
+  });
+
+  it('collapses every framing to contained on a phone', () => {
+    /*
+     * Breaking a gutter is a large-screen gesture. On a phone it is an
+     * image that does not fit, so the whole vocabulary folds back rather
+     * than being allowed to overflow.
+     */
+    const { manifest } = compilePageSpecToProjectManifest(fixture(), { direction: 'service-bold' });
+    const html = Object.values(manifest.files)[0] ?? '';
+
+    expect(html).toContain('@media (max-width:900px)');
+    expect(html).toContain('[data-framing] .frame,[data-framing] .media-inset{margin-left:0;margin-right:0');
+  });
+
+  it('never lays copy or a call to action over a photograph', () => {
+    /*
+     * `overlap` is the one framing that layers copy and picture. The copy
+     * keeps its own stacking context so it rides ABOVE the image rather
+     * than being read through it, and nothing legible is ever set on a
+     * photograph without that guarantee.
+     */
+    const { manifest } = compilePageSpecToProjectManifest(fixture(), { direction: 'clinical-calm' });
+    const html = Object.values(manifest.files)[0] ?? '';
+
+    expect(html).toContain(
+      "[data-framing='overlap'] .section__head,[data-framing='overlap'] .measure{position:relative;z-index:2}",
+    );
+  });
+});
+
+describe('capability hierarchy', () => {
+  it('keeps several distinct capability presentations reachable', () => {
+    const treatments = new Set<string>();
+
+    for (const direction of DIRECTION_IDS) {
+      for (const reference of REFERENCES) {
+        for (const section of planFor(fixture(), direction, reference).sections) {
+          if (section.purpose === 'explain_mechanism' || section.purpose === 'establish_fit') {
+            treatments.add(`${section.layout}/${section.rhythm}`);
+          }
+        }
+      }
+    }
+
+    expect(treatments.size).toBeGreaterThan(5);
+  });
+
+  it('does not weight every capability section the same way', () => {
+    const rhythms = new Set<string>();
+
+    for (const direction of DIRECTION_IDS) {
+      for (const reference of REFERENCES) {
+        for (const section of planFor(fixture(), direction, reference).sections) {
+          rhythms.add(section.rhythm);
+        }
+      }
+    }
+
+    expect(rhythms.size).toBeGreaterThan(1);
+  });
+
+  it('leaves a short list evenly weighted rather than inventing a hierarchy', () => {
+    /*
+     * Hierarchy is earned. Two items are not a lead and a supporting
+     * cast, and dressing them as one is decoration rather than meaning.
+     */
+    const spec = fixture();
+
+    spec.sections = spec.sections.map((section) =>
+      section.items && section.items.length > 0 ? { ...section, items: section.items.slice(0, 2) } : section,
+    );
+
+    for (const direction of DIRECTION_IDS) {
+      for (const section of planFor(spec, direction, 'spec:a').sections) {
+        if ((section.kind === 'vertical_fit' || section.kind === 'mechanism') && section.rhythm !== 'even') {
+          expect(section.rhythm).toBe('even');
+        }
+      }
+    }
+  });
+
+  it('still lets two generations of one direction diverge', () => {
+    const shapes = REFERENCES.map((reference) =>
+      planFor(fixture(), 'conversion-modern', reference)
+        .sections.map((section) => `${section.layout}/${section.rhythm}/${section.framing}`)
+        .join(','),
+    );
+
+    expect(new Set(shapes).size).toBeGreaterThan(1);
+  });
+});

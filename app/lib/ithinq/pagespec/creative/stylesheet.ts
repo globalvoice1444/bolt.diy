@@ -728,6 +728,60 @@ figure{margin:0;position:relative}
 [data-layout='media-full-bleed'] .section-heading{
   font-size:clamp(1.9rem,1.2rem + 3.4vw,calc(var(--size-h1) * .72));max-width:19ch}
 [data-layout='media-full-bleed'] .section-body{font-size:clamp(1.08rem,1rem + .7vw,var(--size-lede))}
+/* ---- art direction: framing, crop, item rhythm ---------------------
+   Framing is how a picture MEETS the page. Placement was the only axis,
+   so every image was a rectangle sitting inside the shell beside some
+   text — correct, and the reason imagery read as placed rather than
+   composed. These rules multiply the existing media layouts instead of
+   adding more of them.
+
+   All of it collapses to contained under 900px: breaking a gutter is
+   a large-screen gesture, and on a phone it is just an image that does
+   not fit. */
+[data-framing='bleed-right'] .frame,[data-framing='bleed-right'] .media-inset{
+  margin-right:calc(-1 * clamp(16px,3.5vw,60px));border-top-right-radius:0;border-bottom-right-radius:0}
+[data-framing='bleed-left'] .frame,[data-framing='bleed-left'] .media-inset{
+  margin-left:calc(-1 * clamp(16px,3.5vw,60px));border-top-left-radius:0;border-bottom-left-radius:0}
+[data-framing='bleed-right'] .frame img,[data-framing='bleed-left'] .frame img{border-radius:inherit}
+/* Larger than its column, so the picture stops being a well-behaved cell
+   and starts anchoring the section. */
+[data-framing='oversized'] .frame,[data-framing='oversized'] .media-inset{
+  width:min(118%,calc(100% + clamp(20px,5vw,110px)))}
+[data-framing='oversized'][data-mirrored='true'] .frame,
+[data-framing='oversized'][data-mirrored='true'] .media-inset{margin-left:auto}
+/* The copy that follows rides up over the picture, so the two layer
+   instead of stacking. The copy keeps its own stacking context and its
+   own ground, so nothing legible is ever laid over a photograph. */
+[data-framing='overlap'] .frame,[data-framing='overlap'] .media-inset{margin-bottom:clamp(-72px,-6vw,-28px)}
+[data-framing='overlap'] .section__head,[data-framing='overlap'] .measure{position:relative;z-index:2}
+/* Crop is an art-direction decision and belongs to the plan, not to
+   whatever ratio the file happened to arrive in. */
+[data-aspect='portrait'] .frame img,[data-aspect='portrait'] .media-inset img{aspect-ratio:4/5;object-fit:cover}
+[data-aspect='square'] .frame img,[data-aspect='square'] .media-inset img{aspect-ratio:1;object-fit:cover}
+[data-aspect='landscape'] .frame img,[data-aspect='landscape'] .media-inset img{aspect-ratio:3/2;object-fit:cover}
+[data-aspect='panorama'] .frame img,[data-aspect='panorama'] .media-inset img{aspect-ratio:21/9;object-fit:cover}
+/* ITEM RHYTHM. Capability beats rendered every item identically, so a
+   section could be scannable and still say nothing about which item
+   mattered. Lead gives the first item the room a lead deserves;
+   staggered alternates so the eye moves down the column rather than
+   straight across a row. Both are expressed on the EXISTING grids, so
+   no layout has to know about them. */
+[data-rhythm='lead'] .cards > :first-child,[data-rhythm='lead'] .mosaic > :first-child{
+  grid-column:1 / -1;padding:clamp(24px,3vw,44px)}
+[data-rhythm='lead'] .cards > :first-child h3,[data-rhythm='lead'] .mosaic > :first-child h3{
+  font-size:clamp(1.35rem,1rem + 1.5vw,calc(var(--size-h3) * 1.7))}
+[data-rhythm='lead'] .rail__item:first-child{padding-block:clamp(20px,2.4vw,34px)}
+[data-rhythm='staggered'] .cards > :nth-child(odd){transform:translateY(clamp(-28px,-2vw,-10px))}
+[data-rhythm='staggered'] .cards > :nth-child(even){transform:translateY(clamp(10px,2vw,28px))}
+@media (max-width:900px){
+  [data-framing] .frame,[data-framing] .media-inset{margin-left:0;margin-right:0;margin-bottom:0;width:100%;
+    border-radius:var(--radius-large)}
+  [data-rhythm='staggered'] .cards > *{transform:none}
+  [data-rhythm='lead'] .cards > :first-child,[data-rhythm='lead'] .mosaic > :first-child{grid-column:auto}
+}
+@media (prefers-reduced-motion:reduce){
+  [data-rhythm='staggered'] .cards > *{transform:none}
+}
 .media-inset{margin:32px 0 0}
 .media-inset img{width:100%;border-radius:var(--radius-large);aspect-ratio:16/9;object-fit:cover}
 [data-image='duotone'] .frame img{filter:grayscale(1) contrast(1.06) brightness(1.02)}

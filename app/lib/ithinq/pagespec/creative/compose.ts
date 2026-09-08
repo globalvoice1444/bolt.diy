@@ -535,6 +535,15 @@ function renderSection(
     attr('data-band', presentation.band),
     attr('data-ground', presentation.ground),
     attr('data-mirrored', String(presentation.mirrored)),
+
+    /*
+     * The art-direction axes reach the sheet as attributes, exactly like
+     * layout and band, so a framing costs no extra markup and can be
+     * restyled per direction without the composer knowing about it.
+     */
+    attr('data-framing', presentation.framing),
+    attr('data-aspect', presentation.aspect),
+    attr('data-rhythm', presentation.rhythm),
     attr('data-split', splitFlavour),
     attr('data-section-index', String(presentation.sourceIndex)),
   ].join(' ');
